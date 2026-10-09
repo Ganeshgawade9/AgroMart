@@ -6,6 +6,7 @@ import useCartStore from '../../store/cartStore';
 import { logout } from '../../api/auth';
 import { getCart } from '../../api/products';
 import { getNotifications } from '../../api/notifications';
+import LocationSelector from './LocationSelector';
 import toast from 'react-hot-toast';
 
 export default function Navbar() {
@@ -55,6 +56,9 @@ export default function Navbar() {
             </div>
             <span className="font-bold text-primary-700 text-lg hidden sm:block">AgroConnect</span>
           </Link>
+
+          {/* Location */}
+          <LocationSelector />
 
           {/* Search */}
           <form onSubmit={handleSearch} className="flex-1 max-w-xl">

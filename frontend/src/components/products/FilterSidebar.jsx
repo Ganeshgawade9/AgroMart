@@ -23,6 +23,8 @@ const DISTANCES = [
   { label: 'Within 5 km', value: 5 },
   { label: 'Within 10 km', value: 10 },
   { label: 'Within 20 km', value: 20 },
+  { label: 'Within 50 km', value: 50 },
+  { label: 'Within 100 km', value: 100 },
 ];
 
 function Section({ title, children, defaultOpen = true }) {
@@ -37,7 +39,7 @@ function Section({ title, children, defaultOpen = true }) {
   );
 }
 
-export default function FilterSidebar({ filters, onChange, userLocation }) {
+export default function FilterSidebar({ filters, onChange, showDistance, radius, onRadiusChange }) {
   const handleChange = (key, value) => onChange({ ...filters, [key]: value });
 
   return (
@@ -78,12 +80,12 @@ export default function FilterSidebar({ filters, onChange, userLocation }) {
         </div>
       </Section>
 
-      {userLocation && (
+      {showDistance && (
         <Section title="Distance">
           <div className="space-y-2">
             {DISTANCES.map(d => (
               <label key={d.value} className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
-                <input type="radio" name="distance" checked={filters.radius == d.value} onChange={() => onChange({ ...filters, radius: d.value, lat: userLocation.lat, lng: userLocation.lng })} className="accent-primary-600 w-4 h-4" />
+                <input type="radio" name="distance" checked={radius == d.value} onChange={() => onRadiusChange(d.value)} className="accent-primary-600 w-4 h-4" />
                 {d.label}
               </label>
             ))}

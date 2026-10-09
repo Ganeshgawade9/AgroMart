@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Search, ArrowRight, Star, ShoppingBag, Truck, Shield, Leaf } from 'lucide-react';
-import { getFeatured, getCategories } from '../api/products';
+import { getFeatured, getCategories, getProducts } from '../api/products';
 import { getNearbyShops } from '../api/maps';
 import ProductCard from '../components/products/ProductCard';
 import Spinner from '../components/common/Spinner';
 import useAuthStore from '../store/authStore';
+import useLocationStore from '../store/locationStore';
 import toast from 'react-hot-toast';
 
 const BANNERS = [
@@ -20,6 +21,8 @@ export default function Home() {
   const [featured, setFeatured] = useState([]);
   const [categories, setCategories] = useState([]);
   const [nearbyShops, setNearbyShops] = useState([]);
+  const [nearbyProducts, setNearbyProducts] = useState([]);
+  const { lat, lng, label, detecting, detect } = useLocationStore();
   const [banner, setBanner] = useState(0);
   const [search, setSearch] = useState('');
   const [loadingFeatured, setLoadingFeatured] = useState(true);
@@ -27,17 +30,24 @@ export default function Home() {
   useEffect(() => {
     getFeatured().then(r => setFeatured(r.data.results || r.data)).catch(() => {}).finally(() => setLoadingFeatured(false));
     getCategories().then(r => setCategories(r.data.results || r.data)).catch(() => {});
-    // Try to get user location for nearby shops
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition((pos) => {
-        getNearbyShops(pos.coords.latitude, pos.coords.longitude, 20)
-          .then(r => setNearbyShops(r.data.shops?.slice(0, 6) || []))
-          .catch(() => {});
-      });
-    }
     const t = setInterval(() => setBanner(b => (b + 1) % BANNERS.length), 4000);
     return () => clearInterval(t);
   }, []);
+
+  // Nearby shops and products follow the location chosen in the navbar
+  useEffect(() => {
+    if (lat == null || lng == null) {
+      setNearbyShops([]);
+      setNearbyProducts([]);
+      return;
+    }
+    getNearbyShops(lat, lng, 20)
+      .then(r => setNearbyShops(r.data.shops?.slice(0, 6) || []))
+      .catch(() => setNearbyShops([]));
+    getProducts({ lat, lng, radius: 20, ordering: 'distance', in_stock: 'true' })
+      .then(r => setNearbyProducts((r.data.results || r.data).slice(0, 10)))
+      .catch(() => setNearbyProducts([]));
+  }, [lat, lng]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -114,6 +124,35 @@ export default function Home() {
             })}
           </div>
         </section>
+
+        {/* Ask for location when none is set */}
+        {lat == null && (
+          <section className="bg-primary-50 border border-primary-100 rounded-2xl p-5 flex items-center gap-4 flex-wrap">
+            <MapPin className="w-8 h-8 text-primary-600 flex-shrink-0" />
+            <div className="flex-1 min-w-[220px]">
+              <h2 className="font-bold text-gray-900">See shops and products near you</h2>
+              <p className="text-sm text-gray-600">Share your location to find the nearest sellers, with distance.</p>
+            </div>
+            <button onClick={detect} disabled={detecting} className="btn-primary">
+              {detecting ? 'Detecting...' : 'Use my current location'}
+            </button>
+          </section>
+        )}
+
+        {/* Products from nearby shops */}
+        {nearbyProducts.length > 0 && (
+          <section>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-primary-600" /> Products near {label || 'you'}
+              </h2>
+              <Link to="/products" className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {nearbyProducts.map(p => <ProductCard key={p.id} product={p} />)}
+            </div>
+          </section>
+        )}
 
         {/* Nearby Shops */}
         {nearbyShops.length > 0 && (

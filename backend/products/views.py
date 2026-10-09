@@ -2,13 +2,37 @@ from rest_framework import generics, status, permissions, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q
+from django.db.models import Q, F, Value, FloatField
+from django.db.models.functions import Cast, Cos, Sin, ACos, Radians, Least, Greatest
 import math
 from .models import Product, Category, Brand, Review, Wishlist, Cart
 from .serializers import (ProductListSerializer, ProductDetailSerializer,
     ProductCreateUpdateSerializer, CategorySerializer, BrandSerializer,
     ReviewSerializer, CartSerializer, WishlistSerializer)
 from .filters import ProductFilter
+
+
+def distance_expression(lat, lng):
+    """Great-circle distance in km between (lat, lng) and the product's seller.
+
+    Uses the spherical law of cosines with database math functions, so the
+    result can be filtered and ordered in SQL (and paginated correctly).
+    Works on SQLite (Django registers the math functions) and PostgreSQL.
+    """
+    f = FloatField()
+    seller_lat = Radians(Cast(F('seller__latitude'), f), output_field=f)
+    seller_lng = Radians(Cast(F('seller__longitude'), f), output_field=f)
+    user_lat = Value(math.radians(lat), output_field=f)
+    user_lng = Value(math.radians(lng), output_field=f)
+
+    cos_angle = (
+        Cos(user_lat, output_field=f) * Cos(seller_lat, output_field=f)
+        * Cos(seller_lng - user_lng, output_field=f)
+        + Sin(user_lat, output_field=f) * Sin(seller_lat, output_field=f)
+    )
+    # Clamp to [-1, 1]: float rounding can push it slightly out of ACos' domain
+    clamped = Least(Value(1.0, output_field=f), Greatest(Value(-1.0, output_field=f), cos_angle), output_field=f)
+    return ACos(clamped, output_field=f) * Value(6371.0, output_field=f)
 
 
 class IsSellerOrReadOnly(permissions.BasePermission):
@@ -30,7 +54,7 @@ class ProductListView(generics.ListAPIView):
     filterset_class = ProductFilter
     search_fields = ['name', 'description', 'seller__seller_profile__shop_name',
                      'seller__village', 'seller__taluka', 'seller__district']
-    ordering_fields = ['price', 'rating', 'created_at']
+    ordering_fields = ['price', 'rating', 'created_at', 'distance']
     ordering = ['-created_at']
 
     def get_queryset(self):
@@ -41,18 +65,27 @@ class ProductListView(generics.ListAPIView):
         lng = self.request.query_params.get('lng')
         radius = self.request.query_params.get('radius', 20)
 
+        located = False
         if lat and lng:
             try:
                 lat, lng, radius = float(lat), float(lng), float(radius)
-                # Filter sellers within radius using bounding box first (fast)
+                if not (-90 <= lat <= 90 and -180 <= lng <= 180) or radius <= 0:
+                    raise ValueError('out of range')
+                # Bounding box first (cheap, can use indexes), exact circle after
                 lat_delta = radius / 111
-                lng_delta = radius / (111 * math.cos(math.radians(lat)))
+                lng_delta = radius / (111 * max(math.cos(math.radians(lat)), 0.01))
                 qs = qs.filter(
                     seller__latitude__range=(lat - lat_delta, lat + lat_delta),
                     seller__longitude__range=(lng - lng_delta, lng + lng_delta)
                 )
+                qs = qs.annotate(distance=distance_expression(lat, lng)).filter(distance__lte=radius)
+                located = True
             except (ValueError, TypeError):
                 pass
+
+        if not located:
+            # Keeps ?ordering=distance harmless when no location was sent
+            qs = qs.annotate(distance=Value(None, output_field=FloatField()))
 
         return qs
 

@@ -186,7 +186,7 @@ export default function ProductCard({ product, onCartUpdate }) {
         )}
 
         {/* Distance */}
-        {product.distance_km && (
+        {product.distance_km != null && (
           <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
             <MapPin className="w-3 h-3" />
             {product.distance_km} km away

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { MapPin, Navigation, Phone, Star, Package } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getNearbyShops } from '../api/maps';
-import useLocation from '../hooks/useLocation';
+import useLocationStore from '../store/locationStore';
 import Spinner from '../components/common/Spinner';
 import ShopsMap from '../components/maps/ShopsMap';
 import toast from 'react-hot-toast';
@@ -11,17 +11,18 @@ export default function NearbyShops() {
   const [shops, setShops] = useState([]);
   const [loading, setLoading] = useState(false);
   const [radius, setRadius] = useState(20);
-  const { location, error, loading: locLoading, getLocation } = useLocation();
+  const { lat, lng, error, detecting: locLoading, detect: getLocation } = useLocationStore();
+  const location = lat != null && lng != null ? { lat, lng } : null;
 
   useEffect(() => {
-    if (location) {
+    if (lat != null && lng != null) {
       setLoading(true);
-      getNearbyShops(location.lat, location.lng, radius)
+      getNearbyShops(lat, lng, radius)
         .then(r => setShops(r.data.shops || []))
         .catch(() => toast.error('Failed to fetch nearby shops'))
         .finally(() => setLoading(false));
     }
-  }, [location, radius]);
+  }, [lat, lng, radius]);
 
   const openMap = (shop) => {
     const url = `https://www.google.com/maps/dir/?api=1&destination=${shop.latitude},${shop.longitude}`;

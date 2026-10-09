@@ -12,6 +12,7 @@ class ProductFilter(filters.FilterSet):
     organic = filters.BooleanFilter(field_name='is_organic')
     brand = filters.NumberFilter(field_name='brand_id')
     category = filters.NumberFilter(field_name='category_id')
+    seller = filters.NumberFilter(field_name='seller_id')
     district = filters.CharFilter(field_name='seller__district', lookup_expr='icontains')
     taluka = filters.CharFilter(field_name='seller__taluka', lookup_expr='icontains')
 
@@ -23,4 +24,4 @@ class ProductFilter(filters.FilterSet):
     class Meta:
         model = Product
         fields = ['min_price', 'max_price', 'category_type', 'in_stock', 'min_rating',
-                  'free_delivery', 'organic', 'brand', 'category', 'district', 'taluka']
+                  'free_delivery', 'organic', 'brand', 'category', 'seller', 'district', 'taluka']

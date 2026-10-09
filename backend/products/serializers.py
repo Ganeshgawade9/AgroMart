@@ -53,6 +53,10 @@ class ProductListSerializer(serializers.ModelSerializer):
         return None
 
     def get_distance_km(self, obj):
+        # The product list view annotates `distance` in SQL; reuse it when present
+        annotated = getattr(obj, 'distance', None)
+        if annotated is not None:
+            return round(float(annotated), 1)
         request = self.context.get('request')
         if not request:
             return None
