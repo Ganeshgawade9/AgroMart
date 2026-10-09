@@ -102,6 +102,7 @@ export default function DeliveryDashboard() {
   const [offers, setOffers] = useState([]);
   const [orders, setOrders] = useState([]);
   const [otpInput, setOtpInput] = useState({});
+  const [pickupOtp, setPickupOtp] = useState({});
   const [busyId, setBusyId] = useState(null);
 
   const watchId = useRef(null);
@@ -211,10 +212,13 @@ export default function DeliveryDashboard() {
   };
 
   const handlePickup = async (order) => {
+    const otp = pickupOtp[order.id];
+    if (!otp || otp.length !== 6) { toast.error('Enter the 6-digit pickup OTP from the shop'); return; }
     setBusyId(order.id);
     try {
-      await confirmPickup(order.id);
+      await confirmPickup(order.id, otp);
       toast.success('Pickup confirmed');
+      setPickupOtp((p) => ({ ...p, [order.id]: '' }));
       fetchOrders();
     } catch (err) {
       toast.error(err.response?.data?.error || 'Could not confirm pickup');
@@ -328,10 +332,26 @@ export default function DeliveryDashboard() {
                         className="w-full flex items-center justify-center gap-2 border border-primary-300 text-primary-700 rounded-xl py-2 text-sm font-medium hover:bg-primary-50 mb-3">
                         <Navigation className="w-4 h-4" /> Navigate to shop
                       </button>
-                      <button onClick={() => handlePickup(order)} disabled={busyId === order.id || !order.ready_for_pickup}
-                        className="w-full bg-primary-600 text-white rounded-xl py-2.5 text-sm font-semibold hover:bg-primary-700 disabled:opacity-40">
-                        {order.ready_for_pickup ? 'Confirm pickup' : 'Waiting for shop to pack...'}
-                      </button>
+                      {order.ready_for_pickup ? (
+                        <div className="bg-primary-50 border border-primary-200 rounded-xl p-3">
+                          <p className="text-sm font-semibold text-primary-800 mb-2">Confirm pickup (OTP from shop)</p>
+                          <div className="flex gap-2">
+                            <input value={pickupOtp[order.id] || ''}
+                              onChange={(e) => setPickupOtp((p) => ({ ...p, [order.id]: e.target.value.replace(/\D/g, '').slice(0, 6) }))}
+                              placeholder="6-digit OTP" maxLength={6} inputMode="numeric"
+                              className="flex-1 border border-primary-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 font-mono tracking-widest" />
+                            <button onClick={() => handlePickup(order)} disabled={busyId === order.id || pickupOtp[order.id]?.length !== 6}
+                              className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-700 disabled:opacity-40">
+                              {busyId === order.id ? '...' : 'Confirm'}
+                            </button>
+                          </div>
+                          <p className="text-xs text-primary-700 mt-2">The shop got this OTP by SMS. Ask them for it when you collect the order.</p>
+                        </div>
+                      ) : (
+                        <button disabled className="w-full bg-primary-600 text-white rounded-xl py-2.5 text-sm font-semibold opacity-40">
+                          Waiting for shop to pack...
+                        </button>
+                      )}
                     </>
                   ) : (
                     <>

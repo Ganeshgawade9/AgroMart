@@ -59,7 +59,14 @@ class Order(models.Model):
     delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
+    # Handover OTPs. delivery_otp: farmer's code, the rider enters it on delivery.
+    # pickup_otp: shop's code, the rider enters it when collecting the order.
     delivery_otp = models.CharField(max_length=6, blank=True)
+    pickup_otp = models.CharField(max_length=6, blank=True)
+    delivery_otp_attempts = models.PositiveSmallIntegerField(default=0)
+    pickup_otp_attempts = models.PositiveSmallIntegerField(default=0)
+    delivery_otp_sent_at = models.DateTimeField(null=True, blank=True)
+    pickup_otp_sent_at = models.DateTimeField(null=True, blank=True)
     notes = models.TextField(blank=True)
 
     # Shipping / Tracking fields

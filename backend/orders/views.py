@@ -7,6 +7,7 @@ import random
 from .models import Order, OrderItem, Invoice
 from .serializers import OrderCreateSerializer, OrderListSerializer, OrderDetailSerializer, DeliveryOrderSerializer
 from . import dispatch
+from . import otp as otp_service
 from products.models import Product, Cart
 from notifications.utils import send_notification
 
@@ -168,11 +169,15 @@ class UpdateOrderStatusView(APIView):
             if new_status not in valid_transitions.get(order.status, []):
                 return Response({'error': f'Cannot transition from {order.status} to {new_status}'}, status=400)
 
+            if new_status == Order.OUT_FOR_DELIVERY and order.delivery_partner_id:
+                # Handing the order to a rider needs the pickup OTP, which only the rider enters
+                return Response({'error': 'The delivery partner must confirm pickup with the pickup OTP.'}, status=400)
+
             order.status = new_status
             if new_status == Order.DELIVERED:
-                otp = request.data.get('otp')
-                if otp != order.delivery_otp:
-                    return Response({'error': 'Invalid OTP'}, status=400)
+                ok, error = otp_service.check_otp(order, otp_service.DELIVERY, request.data.get('otp'))
+                if not ok:
+                    return Response({'error': error}, status=400)
                 order.delivered_at = timezone.now()
                 order.payment_status = 'paid' if order.payment_method == Order.COD else order.payment_status
 
@@ -190,11 +195,16 @@ class UpdateOrderStatusView(APIView):
             if new_status == Order.ACCEPTED:
                 dispatch.start_dispatch(order)
             elif new_status == Order.PACKED:
+                # OTP the rider must quote when collecting the order (SMS to the seller)
+                otp_service.send_otp(order, otp_service.PICKUP, regenerate=True)
                 if order.delivery_partner_id:
                     send_notification(order.delivery_partner, 'order_update',
                                       f'Order #{order.order_number} is packed and ready for pickup.', order.id)
                 else:
                     dispatch.retry_unassigned(order)
+            elif new_status == Order.OUT_FOR_DELIVERY:
+                # Seller delivering without a rider: farmer still gets the delivery OTP
+                otp_service.send_otp(order, otp_service.DELIVERY)
             elif new_status == Order.CANCELLED:
                 dispatch.cancel_open_offers(order)
             return Response({'message': f'Order status updated to {new_status}'})
@@ -243,9 +253,9 @@ class DeliveryUpdateStatusView(APIView):
         except Order.DoesNotExist:
             return Response({'error': 'Order not found or not assigned to you'}, status=404)
 
-        otp = request.data.get('otp', '')
-        if otp != order.delivery_otp:
-            return Response({'error': 'Invalid OTP. Please ask the farmer for the delivery OTP.'}, status=400)
+        ok, error = otp_service.check_otp(order, otp_service.DELIVERY, request.data.get('otp'))
+        if not ok:
+            return Response({'error': error}, status=400)
 
         from django.utils import timezone
         order.status = Order.DELIVERED
@@ -271,12 +281,12 @@ class AssignDeliveryView(APIView):
             delivery_partner = User.objects.get(id=delivery_partner_id, role='delivery', is_active=True)
             dispatch.cancel_open_offers(order)
             order.delivery_partner = delivery_partner
-            order.status = Order.OUT_FOR_DELIVERY
             order.rider_assigned_at = timezone.now()
-            order.picked_up_at = timezone.now()
             order.save()
+            if not order.pickup_otp:
+                otp_service.send_otp(order, otp_service.PICKUP)
             send_notification = __import__('notifications.utils', fromlist=['send_notification']).send_notification
             send_notification(delivery_partner, 'new_order', f'New delivery assigned: Order #{order.order_number}', order.id)
-            return Response({'message': f'Order assigned to {delivery_partner.full_name}'})
+            return Response({'message': f'Order assigned to {delivery_partner.full_name}. They must enter the pickup OTP to collect it.'})
         except (Order.DoesNotExist, User.DoesNotExist) as e:
             return Response({'error': str(e)}, status=404)

@@ -8,7 +8,8 @@ export const getOffers = () => api.get('/orders/delivery/offers/');
 export const acceptOffer = (id) => api.post(`/orders/delivery/offers/${id}/accept/`);
 export const declineOffer = (id) => api.post(`/orders/delivery/offers/${id}/decline/`);
 export const getMyDeliveries = () => api.get('/orders/delivery/my-deliveries/');
-export const confirmPickup = (orderId) => api.post(`/orders/delivery/${orderId}/pickup/`);
+// otp: the pickup OTP the shop received by SMS
+export const confirmPickup = (orderId, otp) => api.post(`/orders/delivery/${orderId}/pickup/`, { otp });
 export const confirmDelivery = (orderId, otp) => api.post(`/orders/delivery/${orderId}/deliver/`, { otp });
 
 // Farmer / seller side

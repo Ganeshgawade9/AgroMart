@@ -5,6 +5,7 @@ from rest_framework.views import APIView
 
 from notifications.utils import send_notification
 from . import dispatch
+from . import otp as otp_service
 from .delivery_models import DeliveryOffer, DeliveryProfile
 from .models import Order
 from .serializers import DeliveryOrderSerializer
@@ -175,12 +176,15 @@ class DeliveryOfferDeclineView(APIView):
 
 
 class DeliveryPickupView(APIView):
-    """Step 5: rider collects the packed order from the shop."""
+    """Step 5: rider collects the packed order from the shop.
+
+    The shop's pickup OTP (SMS to the seller) must be entered to confirm the handover.
+    """
     permission_classes = [IsDeliveryPartner]
 
     def post(self, request, order_id):
         try:
-            order = Order.objects.get(
+            order = Order.objects.select_related('seller', 'farmer').get(
                 id=order_id, delivery_partner=request.user,
                 status__in=[Order.ACCEPTED, Order.PACKED],
             )
@@ -189,12 +193,65 @@ class DeliveryPickupView(APIView):
         if order.status != Order.PACKED:
             return Response({'error': 'The shop is still preparing this order. Please wait until it is packed.'}, status=400)
 
+        if not order.pickup_otp:
+            # Packed before pickup OTPs existed: issue one now
+            otp_service.send_otp(order, otp_service.PICKUP)
+            return Response({'error': 'Pickup OTP sent to the shop. Ask the shop for it and enter it here.',
+                             'otp_required': True}, status=400)
+
+        ok, error = otp_service.check_otp(order, otp_service.PICKUP, request.data.get('otp'))
+        if not ok:
+            return Response({'error': error, 'otp_required': True}, status=400)
+
         order.status = Order.OUT_FOR_DELIVERY
         order.picked_up_at = timezone.now()
-        order.save(update_fields=['status', 'picked_up_at', 'updated_at'])
+        order.pickup_otp = ''  # single use
+        order.save(update_fields=['status', 'picked_up_at', 'pickup_otp', 'updated_at'])
         send_notification(order.farmer, 'order_update',
                           f'Your order #{order.order_number} has been picked up and is on the way!', order.id)
-        return Response({'message': 'Pickup confirmed. Now deliver to the customer.'})
+        # Farmer's delivery OTP goes to their mobile now that the order is on its way
+        otp_service.send_otp(order, otp_service.DELIVERY)
+        return Response({'message': 'Pickup confirmed. Now deliver to the customer and collect the delivery OTP from the farmer.'})
+
+
+class ResendPickupOtpView(APIView):
+    """Seller asks for a fresh pickup OTP (lost SMS, or locked after wrong attempts)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, order_id):
+        if request.user.role != 'seller':
+            return Response({'error': 'Not authorized'}, status=403)
+        try:
+            order = Order.objects.select_related('seller', 'farmer').get(
+                id=order_id, seller=request.user, status=Order.PACKED)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found or not waiting for pickup'}, status=404)
+        wait = otp_service.seconds_until_resend(order, otp_service.PICKUP)
+        if wait:
+            return Response({'error': f'Please wait {wait}s before requesting another OTP.'}, status=429)
+        sent = otp_service.send_otp(order, otp_service.PICKUP, regenerate=True)
+        return Response({'message': 'New pickup OTP sent to your mobile.' if sent else
+                         'New pickup OTP generated. SMS could not be sent, so read it from the order page.'})
+
+
+class ResendDeliveryOtpView(APIView):
+    """Farmer asks for a fresh delivery OTP (lost SMS, or locked after wrong attempts)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, order_id):
+        if request.user.role != 'farmer':
+            return Response({'error': 'Not authorized'}, status=403)
+        try:
+            order = Order.objects.select_related('seller', 'farmer').get(
+                id=order_id, farmer=request.user, status=Order.OUT_FOR_DELIVERY)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found or not out for delivery'}, status=404)
+        wait = otp_service.seconds_until_resend(order, otp_service.DELIVERY)
+        if wait:
+            return Response({'error': f'Please wait {wait}s before requesting another OTP.'}, status=429)
+        sent = otp_service.send_otp(order, otp_service.DELIVERY, regenerate=True)
+        return Response({'message': 'New delivery OTP sent to your mobile.' if sent else
+                         'New delivery OTP generated. SMS could not be sent, so read it from the order page.'})
 
 
 class OrderTrackingView(APIView):

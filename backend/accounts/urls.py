@@ -9,6 +9,8 @@ urlpatterns = [
     path('logout/', views.LogoutView.as_view(), name='logout'),
     path('profile/', views.ProfileView.as_view(), name='profile'),
     path('update-location/', views.UpdateLocationView.as_view(), name='update_location'),
+    path('forgot-password/', views.ForgotPasswordView.as_view(), name='forgot_password'),
+    path('reset-password/', views.ResetPasswordView.as_view(), name='reset_password'),
     path('change-password/', views.ChangePasswordView.as_view(), name='change_password'),
     path('seller-profile/', views.UpdateSellerProfileView.as_view(), name='seller_profile'),
     # Admin

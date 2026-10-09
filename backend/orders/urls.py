@@ -38,6 +38,7 @@ urlpatterns += [
 from .delivery_views import (
     DeliveryDutyView, DeliveryLocationView, DeliveryOffersView, DeliveryOfferAcceptView,
     DeliveryOfferDeclineView, DeliveryPickupView, OrderTrackingView,
+    ResendPickupOtpView, ResendDeliveryOtpView,
 )
 urlpatterns += [
     path('delivery/duty/', DeliveryDutyView.as_view(), name='delivery_duty'),
@@ -47,4 +48,6 @@ urlpatterns += [
     path('delivery/offers/<int:offer_id>/decline/', DeliveryOfferDeclineView.as_view(), name='delivery_offer_decline'),
     path('delivery/<int:order_id>/pickup/', DeliveryPickupView.as_view(), name='delivery_pickup'),
     path('<int:order_id>/tracking/', OrderTrackingView.as_view(), name='order_tracking'),
+    path('<int:order_id>/resend-pickup-otp/', ResendPickupOtpView.as_view(), name='resend_pickup_otp'),
+    path('<int:order_id>/resend-delivery-otp/', ResendDeliveryOtpView.as_view(), name='resend_delivery_otp'),
 ]

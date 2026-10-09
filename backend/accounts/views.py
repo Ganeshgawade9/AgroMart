@@ -6,8 +6,12 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
-from .serializers import RegisterSerializer, UserSerializer, ChangePasswordSerializer, SellerProfileSerializer
+from .serializers import (
+    RegisterSerializer, UserSerializer, ChangePasswordSerializer, SellerProfileSerializer,
+    ForgotPasswordSerializer, ResetPasswordSerializer,
+)
 from .models import SellerProfile
+from . import otp as password_otp
 
 User = get_user_model()
 
@@ -108,6 +112,43 @@ class ChangePasswordView(APIView):
         user.set_password(serializer.validated_data['new_password'])
         user.save()
         return Response({'message': 'Password changed successfully'})
+
+
+class ForgotPasswordView(APIView):
+    """Step 1: send a reset OTP by SMS to the account's registered mobile number."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = ForgotPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = password_otp.find_user(serializer.validated_data['identifier'])
+        if user:
+            password_otp.issue_otp(user)
+        # Same answer whether or not the account exists, so this cannot be used to probe for users
+        return Response({'message': 'If an account exists with these details, an OTP has been sent to its registered mobile number.'})
+
+
+class ResetPasswordView(APIView):
+    """Step 2: verify the OTP and set a new password."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = ResetPasswordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        user = password_otp.find_user(data['identifier'])
+        if not user or not password_otp.verify_otp(user, data['otp']):
+            return Response({'error': 'Invalid or expired OTP'}, status=400)
+
+        user.set_password(data['new_password'])
+        user.save(update_fields=['password'])
+        # Sign the user out everywhere: old refresh tokens stop working
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+        for token in OutstandingToken.objects.filter(user=user):
+            BlacklistedToken.objects.get_or_create(token=token)
+        return Response({'message': 'Password reset successfully. You can now log in.'})
 
 
 class LogoutView(APIView):

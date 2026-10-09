@@ -6,6 +6,8 @@ export const getOrder = (id) => api.get(`/orders/${id}/`);
 export const updateOrderStatus = (id, status, otp, extra = {}) => api.post(`/orders/${id}/update-status/`, { status, otp, ...extra });
 export const createRazorpayOrder = (amount) => api.post('/orders/razorpay/create/', { amount });
 export const getSellerDashboardStats = () => api.get('/orders/seller-dashboard-stats/');
+export const resendPickupOtp = (id) => api.post(`/orders/${id}/resend-pickup-otp/`);
+export const resendDeliveryOtp = (id) => api.post(`/orders/${id}/resend-delivery-otp/`);
 export const downloadInvoice = (id) => api.get(`/orders/${id}/invoice/`, { responseType: 'blob' });
 
 // Payment endpoints

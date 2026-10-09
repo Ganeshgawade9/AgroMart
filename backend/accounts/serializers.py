@@ -92,3 +92,19 @@ class ChangePasswordSerializer(serializers.Serializer):
         if attrs['new_password'] != attrs['new_password2']:
             raise serializers.ValidationError({'new_password': 'Passwords do not match'})
         return attrs
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    identifier = serializers.CharField(help_text='Registered email or mobile number')
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    identifier = serializers.CharField()
+    otp = serializers.RegexField(r'^\d{6}$', error_messages={'invalid': 'OTP must be 6 digits'})
+    new_password = serializers.CharField(min_length=6)
+    new_password2 = serializers.CharField()
+
+    def validate(self, attrs):
+        if attrs['new_password'] != attrs['new_password2']:
+            raise serializers.ValidationError({'new_password': 'Passwords do not match'})
+        return attrs

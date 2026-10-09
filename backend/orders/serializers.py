@@ -70,8 +70,15 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         # The OTP proves the farmer received the order. Sellers and delivery
         # partners must not be able to read it from the API.
         request = self.context.get('request')
-        if not request or getattr(request.user, 'role', None) != 'farmer':
+        role = getattr(request.user, 'role', None) if request else None
+        if role != 'farmer':
             data.pop('delivery_otp', None)
+        # The pickup OTP belongs to the shop; the rider has to be given it in person
+        if role != 'seller':
+            data.pop('pickup_otp', None)
+        for field in ('pickup_otp_attempts', 'delivery_otp_attempts',
+                      'pickup_otp_sent_at', 'delivery_otp_sent_at'):
+            data.pop(field, None)
         return data
 
     def get_seller_shop_logo(self, obj):

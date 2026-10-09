@@ -12,3 +12,7 @@ export const getFarmerList = () => api.get('/auth/admin/farmers/');
 export const updateSellerProfile = (data) => api.patch('/auth/seller-profile/', data, {
   headers: { 'Content-Type': 'multipart/form-data' }
 });
+
+// Forgot password: OTP is sent by SMS to the account's registered mobile number
+export const forgotPassword = (identifier) => api.post('/auth/forgot-password/', { identifier });
+export const resetPassword = (data) => api.post('/auth/reset-password/', data);

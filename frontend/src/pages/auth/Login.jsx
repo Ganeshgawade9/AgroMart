@@ -99,6 +99,11 @@ export default function Login() {
               </button>
             </div>
           </div>
+          <div className="text-right -mt-2">
+            <Link to="/forgot-password" className="text-sm text-primary-600 font-medium hover:underline">
+              Forgot password?
+            </Link>
+          </div>
           <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 text-base">
             {loading ? 'Logging in...' : 'Login'}
           </button>

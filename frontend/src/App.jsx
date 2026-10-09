@@ -16,6 +16,7 @@ import Profile from './pages/Profile';
 // Auth
 import Login from './pages/auth/Login';
 import Register from './pages/auth/Register';
+import ForgotPassword from './pages/auth/ForgotPassword';
 
 // Farmer
 import FarmerDashboard from './pages/farmer/Dashboard';
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="/nearby-shops" element={<NearbyShops />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Authenticated - Any role */}
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />

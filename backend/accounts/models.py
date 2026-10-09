@@ -129,3 +129,19 @@ class FarmerProfile(models.Model):
 
     def __str__(self):
         return f"{self.user.full_name}'s farm profile"
+
+
+class PasswordResetOTP(models.Model):
+    """One-time code sent by SMS to a user's registered mobile to reset the password."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='password_reset_otps')
+    code_hash = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Password reset OTP for {self.user_id} ({'used' if self.used_at else 'open'})"

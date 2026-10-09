@@ -11,6 +11,7 @@ import {
 import {
   getOrder,
   updateOrderStatus,
+  resendPickupOtp,
   downloadInvoice
 } from '../../api/orders';
 
@@ -93,6 +94,16 @@ export default function SellerOrderDetail() {
       );
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleResendPickupOtp = async () => {
+    try {
+      const res = await resendPickupOtp(order.id);
+      toast.success(res.data.message);
+      fetchOrder();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not send OTP');
     }
   };
 
@@ -449,6 +460,22 @@ export default function SellerOrderDetail() {
               <option key={m} value={m}>{m} min</option>
             ))}
           </select>
+        </div>
+      )}
+
+      {/* ================================
+          PICKUP OTP (shop -> delivery partner)
+      ================================= */}
+      {order.status === 'packed' && order.pickup_otp && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-3">
+          <p className="text-sm font-semibold text-amber-900">Pickup OTP</p>
+          <p className="text-2xl font-mono font-bold tracking-widest text-amber-900 my-1">{order.pickup_otp}</p>
+          <p className="text-xs text-amber-800">
+            Also sent to your mobile. Give it to the delivery partner only when they collect the order.
+          </p>
+          <button onClick={handleResendPickupOtp} className="text-xs font-semibold text-amber-900 underline mt-2">
+            Send a new OTP
+          </button>
         </div>
       )}
 

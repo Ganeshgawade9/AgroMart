@@ -12,7 +12,8 @@ import {
 import {
   getOrder,
   downloadInvoice,
-  initiatePayment
+  initiatePayment,
+  resendDeliveryOtp
 } from '../../api/orders';
 
 import {
@@ -49,6 +50,17 @@ export default function OrderDetail() {
         setLoading(false);
       });
   }, [id]);
+
+  const handleResendOtp = async () => {
+    try {
+      const res = await resendDeliveryOtp(order.id);
+      toast.success(res.data.message);
+      const fresh = await getOrder(order.id);
+      setOrder(fresh.data);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Could not send OTP');
+    }
+  };
 
   /* ================================
      DOWNLOAD INVOICE
@@ -571,6 +583,20 @@ export default function OrderDetail() {
               </span>
 
             </p>
+
+            {order.status === 'out_for_delivery' && (
+              <>
+                <p className="text-[10px] text-primary-700 mt-1">
+                  Also sent to your mobile. Share it with the delivery partner only after you receive your order.
+                </p>
+                <button
+                  onClick={handleResendOtp}
+                  className="text-[10px] font-semibold text-primary-800 underline mt-1"
+                >
+                  Send a new OTP
+                </button>
+              </>
+            )}
 
           </div>
 

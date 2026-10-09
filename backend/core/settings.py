@@ -109,3 +109,16 @@ RAZORPAY_KEY_ID = config('RAZORPAY_KEY_ID', default='')
 RAZORPAY_KEY_SECRET = config('RAZORPAY_KEY_SECRET', default='')
 OPENAI_API_KEY = config('OPENAI_API_KEY', default='')
 COHERE_API_KEY = config('COHERE_API_KEY', default='')
+
+
+# --- SMS / OTP -------------------------------------------------------------
+# 'console' only logs the message (development). Use 'fast2sms' or 'twilio'
+# in production and fill in the matching keys in .env.
+SMS_BACKEND = config('SMS_BACKEND', default='console')
+FAST2SMS_API_KEY = config('FAST2SMS_API_KEY', default='')
+TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
+TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
+TWILIO_FROM_NUMBER = config('TWILIO_FROM_NUMBER', default='')
+OTP_EXPIRY_MINUTES = config('OTP_EXPIRY_MINUTES', default=10, cast=int)
+OTP_MAX_ATTEMPTS = config('OTP_MAX_ATTEMPTS', default=5, cast=int)
+OTP_RESEND_SECONDS = config('OTP_RESEND_SECONDS', default=60, cast=int)
