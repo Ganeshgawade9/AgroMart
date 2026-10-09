@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🌿 AgroConnect — Agricultural E-Commerce Platform
 
 > **MCA Final Year Project** | JSPM University, Pune  
@@ -280,3 +281,6 @@ npm run dev
 
 Frontend runs at: **http://localhost:5173**
 
+=======
+# AgroMart
+>>>>>>> 4e51f4ed554f1dfc94848841fdd86d1357186186
