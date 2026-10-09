@@ -22,6 +22,8 @@ class OrderCreateSerializer(serializers.Serializer):
     delivery_district = serializers.CharField(allow_blank=True)
     delivery_pincode = serializers.CharField(allow_blank=True)
     delivery_phone = serializers.CharField()
+    delivery_latitude = serializers.FloatField(required=False, allow_null=True, min_value=-90, max_value=90)
+    delivery_longitude = serializers.FloatField(required=False, allow_null=True, min_value=-180, max_value=180)
     payment_method = serializers.ChoiceField(choices=['cod', 'upi', 'razorpay'])
     notes = serializers.CharField(allow_blank=True, required=False)
     coupon_code = serializers.CharField(allow_blank=True, required=False)
@@ -63,6 +65,15 @@ class OrderDetailSerializer(serializers.ModelSerializer):
         model = Order
         fields = '__all__'
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # The OTP proves the farmer received the order. Sellers and delivery
+        # partners must not be able to read it from the API.
+        request = self.context.get('request')
+        if not request or getattr(request.user, 'role', None) != 'farmer':
+            data.pop('delivery_otp', None)
+        return data
+
     def get_seller_shop_logo(self, obj):
         try:
             logo = obj.seller.seller_profile.shop_logo
@@ -88,3 +99,66 @@ class OrderDetailSerializer(serializers.ModelSerializer):
                 'paid_at': payment.paid_at.isoformat() if payment.paid_at else None,
             }
         return None
+
+
+
+def _coord(value):
+    return float(value) if value is not None else None
+
+
+class DeliveryOrderSerializer(serializers.ModelSerializer):
+    """What a delivery partner needs to pick up and deliver an assigned order."""
+    items = serializers.SerializerMethodField()
+    customer_name = serializers.CharField(source='farmer.full_name', read_only=True)
+    shop_name = serializers.SerializerMethodField()
+    shop_address = serializers.SerializerMethodField()
+    shop_phone = serializers.CharField(source='seller.phone', read_only=True)
+    shop_latitude = serializers.SerializerMethodField()
+    shop_longitude = serializers.SerializerMethodField()
+    customer_latitude = serializers.SerializerMethodField()
+    customer_longitude = serializers.SerializerMethodField()
+    cash_to_collect = serializers.SerializerMethodField()
+    ready_for_pickup = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Order
+        fields = [
+            'id', 'order_number', 'status', 'payment_method', 'payment_status', 'total',
+            'delivery_charge', 'created_at', 'delivered_at', 'rider_assigned_at', 'picked_up_at',
+            'estimated_prep_minutes', 'items', 'customer_name', 'delivery_address',
+            'delivery_village', 'delivery_taluka', 'delivery_district', 'delivery_pincode',
+            'delivery_phone', 'customer_latitude', 'customer_longitude', 'shop_name',
+            'shop_address', 'shop_phone', 'shop_latitude', 'shop_longitude',
+            'cash_to_collect', 'ready_for_pickup',
+        ]
+
+    def get_items(self, obj):
+        return [{'name': i.product_name, 'quantity': i.quantity} for i in obj.items.all()]
+
+    def get_shop_name(self, obj):
+        profile = getattr(obj.seller, 'seller_profile', None)
+        return profile.shop_name if profile else obj.seller.full_name
+
+    def get_shop_address(self, obj):
+        parts = [obj.seller.address, obj.seller.village, obj.seller.district]
+        return ', '.join(p for p in parts if p)
+
+    def get_shop_latitude(self, obj):
+        return _coord(obj.seller.latitude)
+
+    def get_shop_longitude(self, obj):
+        return _coord(obj.seller.longitude)
+
+    def get_customer_latitude(self, obj):
+        return _coord(obj.delivery_latitude)
+
+    def get_customer_longitude(self, obj):
+        return _coord(obj.delivery_longitude)
+
+    def get_cash_to_collect(self, obj):
+        if obj.payment_method == Order.COD and obj.payment_status != 'paid':
+            return float(obj.total)
+        return 0
+
+    def get_ready_for_pickup(self, obj):
+        return obj.status == Order.PACKED

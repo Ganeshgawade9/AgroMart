@@ -21,6 +21,7 @@ import {
 
 import Spinner from '../../components/common/Spinner';
 import useCartStore from '../../store/cartStore';
+import useLocationStore from '../../store/locationStore';
 import toast from 'react-hot-toast';
 
 
@@ -478,6 +479,12 @@ export default function Checkout() {
 
         delivery_phone:
           addr.phone.trim(),
+
+        // Map pin from the location chosen in the navbar (helps riders find you)
+        ...(useLocationStore.getState().lat != null && {
+          delivery_latitude: useLocationStore.getState().lat,
+          delivery_longitude: useLocationStore.getState().lng
+        }),
 
         coupon_code:
           appliedCoupon

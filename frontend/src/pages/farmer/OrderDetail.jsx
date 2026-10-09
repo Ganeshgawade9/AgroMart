@@ -24,6 +24,7 @@ import {
 } from '../../utils/helpers';
 
 import OrderStatusTracker from '../../components/orders/OrderStatusTracker';
+import DeliveryTracking from '../../components/orders/DeliveryTracking';
 import Spinner from '../../components/common/Spinner';
 import toast from 'react-hot-toast';
 
@@ -290,6 +291,15 @@ export default function OrderDetail() {
 
         </div>
       )}
+
+      {/* ================================
+          DELIVERY PARTNER TRACKING
+      ================================= */}
+      <DeliveryTracking
+        orderId={order.id}
+        orderStatus={order.status}
+        viewer="farmer"
+      />
 
       {/* ================================
           ORDER ITEMS

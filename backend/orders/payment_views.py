@@ -48,6 +48,15 @@ class InitiatePaymentView(APIView):
         if not delivery_address or not delivery_phone:
             return Response({'error': 'Delivery address and phone are required'}, status=400)
 
+        # Optional map pin for the delivery address (lets riders navigate and be matched by distance)
+        delivery_lat = delivery_lng = None
+        try:
+            lat, lng = float(data.get('delivery_latitude')), float(data.get('delivery_longitude'))
+            if -90 <= lat <= 90 and -180 <= lng <= 180:
+                delivery_lat, delivery_lng = round(lat, 6), round(lng, 6)
+        except (TypeError, ValueError):
+            pass
+
         # Validate products and calculate totals by seller
         products_by_seller = {}
         for item in items_data:
@@ -84,6 +93,8 @@ class InitiatePaymentView(APIView):
                 'delivery_district': data.get('delivery_district', ''),
                 'delivery_pincode': data.get('delivery_pincode', ''),
                 'delivery_phone': delivery_phone,
+                'delivery_latitude': delivery_lat,
+                'delivery_longitude': delivery_lng,
                 'notes': data.get('notes', ''),
                 'subtotal': float(subtotal),
                 'gst': float(gst),
@@ -171,6 +182,8 @@ class InitiatePaymentView(APIView):
             delivery_district=checkout_data.get('delivery_district', ''),
             delivery_pincode=checkout_data.get('delivery_pincode', ''),
             delivery_phone=checkout_data['delivery_phone'],
+            delivery_latitude=checkout_data.get('delivery_latitude'),
+            delivery_longitude=checkout_data.get('delivery_longitude'),
             delivery_otp=str(random.randint(100000, 999999)),
             notes=checkout_data.get('notes', ''),
         )

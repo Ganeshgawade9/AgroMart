@@ -55,6 +55,9 @@ class Order(models.Model):
     delivery_district = models.CharField(max_length=100, blank=True)
     delivery_pincode = models.CharField(max_length=10, blank=True)
     delivery_phone = models.CharField(max_length=15)
+    # Optional map pin of the delivery address (used for rider dispatch and navigation)
+    delivery_latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    delivery_longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
 
     delivery_otp = models.CharField(max_length=6, blank=True)
     notes = models.TextField(blank=True)
@@ -62,6 +65,11 @@ class Order(models.Model):
     # Shipping / Tracking fields
     tracking_number = models.CharField(max_length=100, blank=True)
     expected_delivery = models.DateField(null=True, blank=True)
+
+    # Dispatch / delivery timeline
+    estimated_prep_minutes = models.PositiveSmallIntegerField(default=20)
+    rider_assigned_at = models.DateTimeField(null=True, blank=True)
+    picked_up_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -121,3 +129,4 @@ class Invoice(models.Model):
 
 # Import Payment model so Django discovers it for migrations
 from .payment_models import Payment  # noqa: E402, F401
+from .delivery_models import DeliveryProfile, DeliveryOffer  # noqa: E402, F401

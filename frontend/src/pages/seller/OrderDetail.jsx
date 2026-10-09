@@ -23,6 +23,7 @@ import {
 } from '../../utils/helpers';
 
 import OrderStatusTracker from '../../components/orders/OrderStatusTracker';
+import DeliveryTracking from '../../components/orders/DeliveryTracking';
 import Spinner from '../../components/common/Spinner';
 import toast from 'react-hot-toast';
 
@@ -39,6 +40,7 @@ export default function SellerOrderDetail() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [prepMinutes, setPrepMinutes] = useState(20);
 
   /* ================================
      FETCH ORDER
@@ -72,7 +74,12 @@ export default function SellerOrderDetail() {
     setUpdating(true);
 
     try {
-      await updateOrderStatus(order.id, newStatus);
+      await updateOrderStatus(
+        order.id,
+        newStatus,
+        undefined,
+        newStatus === 'accepted' ? { prep_minutes: prepMinutes } : {}
+      );
 
       toast.success(
         `Order marked as ${getStatusLabel(newStatus)}`
@@ -415,9 +422,41 @@ export default function SellerOrderDetail() {
       </div>
 
       {/* ================================
+          DELIVERY DISPATCH
+      ================================= */}
+      <div className="mb-4">
+        <DeliveryTracking
+          orderId={order.id}
+          orderStatus={order.status}
+          viewer="seller"
+          onChange={fetchOrder}
+        />
+      </div>
+
+      {/* Preparation time (used to plan rider pickup) */}
+      {order.status === 'pending' && (
+        <div className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl px-4 py-3 mb-3 text-sm">
+          <label htmlFor="prep" className="text-gray-700 font-medium">
+            Time to prepare this order
+          </label>
+          <select
+            id="prep"
+            value={prepMinutes}
+            onChange={(e) => setPrepMinutes(Number(e.target.value))}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            {[10, 15, 20, 30, 45, 60, 120].map((m) => (
+              <option key={m} value={m}>{m} min</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* ================================
           ORDER STATUS ACTIONS
       ================================= */}
-      {NEXT_STATUS[order.status] && (
+      {NEXT_STATUS[order.status] &&
+        !(order.status === 'packed' && order.delivery_partner) && (
         <button
           onClick={() =>
             handleUpdate(

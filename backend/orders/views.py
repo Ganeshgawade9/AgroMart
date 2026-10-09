@@ -5,7 +5,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 import random
 from .models import Order, OrderItem, Invoice
-from .serializers import OrderCreateSerializer, OrderListSerializer, OrderDetailSerializer
+from .serializers import OrderCreateSerializer, OrderListSerializer, OrderDetailSerializer, DeliveryOrderSerializer
+from . import dispatch
 from products.models import Product, Cart
 from notifications.utils import send_notification
 
@@ -85,6 +86,8 @@ class PlaceOrderView(APIView):
                 delivery_district=data.get('delivery_district', ''),
                 delivery_pincode=data.get('delivery_pincode', ''),
                 delivery_phone=data['delivery_phone'],
+                delivery_latitude=data.get('delivery_latitude'),
+                delivery_longitude=data.get('delivery_longitude'),
                 delivery_otp=str(random.randint(100000, 999999)),
                 notes=data.get('notes', ''),
             )
@@ -173,8 +176,27 @@ class UpdateOrderStatusView(APIView):
                 order.delivered_at = timezone.now()
                 order.payment_status = 'paid' if order.payment_method == Order.COD else order.payment_status
 
+            if new_status == Order.ACCEPTED:
+                try:
+                    prep = int(request.data.get('prep_minutes', order.estimated_prep_minutes))
+                    order.estimated_prep_minutes = min(max(prep, 5), 240)
+                except (TypeError, ValueError):
+                    pass
+
             order.save()
             send_notification(order.farmer, 'order_update', f'Your order #{order.order_number} is now {order.get_status_display()}', order.id)
+
+            # Delivery dispatch: find a rider while the shop prepares the order
+            if new_status == Order.ACCEPTED:
+                dispatch.start_dispatch(order)
+            elif new_status == Order.PACKED:
+                if order.delivery_partner_id:
+                    send_notification(order.delivery_partner, 'order_update',
+                                      f'Order #{order.order_number} is packed and ready for pickup.', order.id)
+                else:
+                    dispatch.retry_unassigned(order)
+            elif new_status == Order.CANCELLED:
+                dispatch.cancel_open_offers(order)
             return Response({'message': f'Order status updated to {new_status}'})
 
         except Order.DoesNotExist:
@@ -198,11 +220,15 @@ class RazorpayCreateOrderView(APIView):
 
 class DeliveryOrderListView(generics.ListAPIView):
     """Orders assigned to delivery partner."""
-    serializer_class = OrderListSerializer
+    serializer_class = DeliveryOrderSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        return Order.objects.filter(delivery_partner=self.request.user)
+        if self.request.user.role != 'delivery':
+            return Order.objects.none()
+        return (Order.objects.filter(delivery_partner=self.request.user)
+                .select_related('farmer', 'seller', 'seller__seller_profile')
+                .prefetch_related('items'))
 
 
 class DeliveryUpdateStatusView(APIView):
@@ -243,8 +269,11 @@ class AssignDeliveryView(APIView):
         try:
             order = Order.objects.get(id=order_id, seller=request.user, status=Order.PACKED)
             delivery_partner = User.objects.get(id=delivery_partner_id, role='delivery', is_active=True)
+            dispatch.cancel_open_offers(order)
             order.delivery_partner = delivery_partner
             order.status = Order.OUT_FOR_DELIVERY
+            order.rider_assigned_at = timezone.now()
+            order.picked_up_at = timezone.now()
             order.save()
             send_notification = __import__('notifications.utils', fromlist=['send_notification']).send_notification
             send_notification(delivery_partner, 'new_order', f'New delivery assigned: Order #{order.order_number}', order.id)

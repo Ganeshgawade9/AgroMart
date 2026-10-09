@@ -34,3 +34,17 @@ urlpatterns += [
     path('delivery/<int:order_id>/deliver/', DeliveryUpdateStatusView.as_view(), name='delivery_complete'),
     path('<int:order_id>/assign-delivery/', AssignDeliveryView.as_view(), name='assign_delivery'),
 ]
+
+from .delivery_views import (
+    DeliveryDutyView, DeliveryLocationView, DeliveryOffersView, DeliveryOfferAcceptView,
+    DeliveryOfferDeclineView, DeliveryPickupView, OrderTrackingView,
+)
+urlpatterns += [
+    path('delivery/duty/', DeliveryDutyView.as_view(), name='delivery_duty'),
+    path('delivery/location/', DeliveryLocationView.as_view(), name='delivery_location'),
+    path('delivery/offers/', DeliveryOffersView.as_view(), name='delivery_offers'),
+    path('delivery/offers/<int:offer_id>/accept/', DeliveryOfferAcceptView.as_view(), name='delivery_offer_accept'),
+    path('delivery/offers/<int:offer_id>/decline/', DeliveryOfferDeclineView.as_view(), name='delivery_offer_decline'),
+    path('delivery/<int:order_id>/pickup/', DeliveryPickupView.as_view(), name='delivery_pickup'),
+    path('<int:order_id>/tracking/', OrderTrackingView.as_view(), name='order_tracking'),
+]
