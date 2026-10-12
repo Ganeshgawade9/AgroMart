@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Leaf } from 'lucide-react';
 import { forgotPassword, resetPassword } from '../../api/auth';
+import { useT } from '../../i18n';
 import toast from 'react-hot-toast';
 
 // Step 1: enter email or mobile -> OTP is sent by SMS to the registered mobile number
 // Step 2: enter OTP + new password
 export default function ForgotPassword() {
+  const { t } = useT();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [identifier, setIdentifier] = useState('');
@@ -24,11 +26,11 @@ export default function ForgotPassword() {
     e?.preventDefault();
     setLoading(true);
     try {
-      const res = await forgotPassword(identifier.trim());
-      toast.success(res.data.message);
+      await forgotPassword(identifier.trim());
+      toast.success(t('forgot.otp_sent'));
       setStep(2);
     } catch (err) {
-      toast.error(errorMessage(err, 'Could not send OTP. Please try again.'));
+      toast.error(errorMessage(err, t('forgot.send_failed')));
     } finally {
       setLoading(false);
     }
@@ -37,16 +39,16 @@ export default function ForgotPassword() {
   const submitReset = async (e) => {
     e.preventDefault();
     if (form.new_password !== form.new_password2) {
-      toast.error('Passwords do not match');
+      toast.error(t('forgot.mismatch'));
       return;
     }
     setLoading(true);
     try {
       await resetPassword({ identifier: identifier.trim(), ...form });
-      toast.success('Password reset. Please log in with your new password.');
+      toast.success(t('forgot.done'));
       navigate('/login');
     } catch (err) {
-      toast.error(errorMessage(err, 'Could not reset password'));
+      toast.error(errorMessage(err, t('forgot.reset_failed')));
     } finally {
       setLoading(false);
     }
@@ -61,47 +63,47 @@ export default function ForgotPassword() {
           </div>
           <span className="font-bold text-2xl text-primary-700">AgroConnect</span>
         </div>
-        <h1 className="text-xl font-bold text-gray-900 text-center mb-1">Forgot Password</h1>
+        <h1 className="text-xl font-bold text-gray-900 text-center mb-1">{t('forgot.title')}</h1>
         <p className="text-gray-500 text-sm text-center mb-6">
           {step === 1
-            ? 'We will send an OTP to your registered mobile number'
-            : 'Enter the OTP we sent to your registered mobile number'}
+            ? t('forgot.step1')
+            : t('forgot.step2')}
         </p>
 
         {step === 1 ? (
           <form onSubmit={sendOtp} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Email or mobile number</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1">{t('forgot.identifier')}</label>
               <input
                 className="input"
                 type="text"
-                placeholder="you@example.com or 9876543210"
+                placeholder={t('forgot.identifier_ph')}
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 required
               />
             </div>
             <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 text-base">
-              {loading ? 'Sending...' : 'Send OTP'}
+              {loading ? t('forgot.sending') : t('forgot.send')}
             </button>
           </form>
         ) : (
           <form onSubmit={submitReset} className="space-y-4">
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">OTP</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1">{t('forgot.otp')}</label>
               <input
                 className="input font-mono tracking-widest"
                 type="text"
                 inputMode="numeric"
                 maxLength={6}
-                placeholder="6-digit OTP"
+                placeholder={t('forgot.otp_ph')}
                 value={form.otp}
                 onChange={(e) => setForm({ ...form, otp: e.target.value.replace(/\D/g, '').slice(0, 6) })}
                 required
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">New password</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1">{t('forgot.new_password')}</label>
               <input
                 className="input"
                 type="password"
@@ -112,7 +114,7 @@ export default function ForgotPassword() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Confirm new password</label>
+              <label className="text-sm font-medium text-gray-700 block mb-1">{t('forgot.confirm_password')}</label>
               <input
                 className="input"
                 type="password"
@@ -123,16 +125,16 @@ export default function ForgotPassword() {
               />
             </div>
             <button type="submit" disabled={loading || form.otp.length !== 6} className="btn-primary w-full py-2.5 text-base">
-              {loading ? 'Resetting...' : 'Reset Password'}
+              {loading ? t('forgot.resetting') : t('forgot.reset')}
             </button>
             <button type="button" onClick={sendOtp} disabled={loading} className="w-full text-sm text-primary-600 font-medium hover:underline">
-              Resend OTP
+              {t('forgot.resend')}
             </button>
           </form>
         )}
 
         <p className="text-center text-sm text-gray-600 mt-4">
-          <Link to="/login" className="text-primary-600 font-semibold hover:underline">Back to login</Link>
+          <Link to="/login" className="text-primary-600 font-semibold hover:underline">{t('forgot.back')}</Link>
         </p>
       </div>
     </div>

@@ -2,11 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { MapPin, ChevronDown, Crosshair, Search, X, Loader2 } from 'lucide-react';
 import useLocationStore from '../../store/locationStore';
 import { searchPlaces } from '../../utils/geocode';
+import { useT } from '../../i18n';
 import toast from 'react-hot-toast';
 
 // Zomato-style location pill for the navbar: tap -> detect live GPS location
 // or search for an area manually.
 export default function LocationSelector() {
+  const { t } = useT();
   const { lat, lng, label, detecting, error, detect, setManual, clear } = useLocationStore();
   const hasLocation = lat != null && lng != null;
 
@@ -42,7 +44,7 @@ export default function LocationSelector() {
     const ok = await detect();
     if (ok) {
       setOpen(false);
-      toast.success('Location updated');
+      toast.success(t('loc.updated'));
     }
   };
 
@@ -59,7 +61,7 @@ export default function LocationSelector() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex items-center gap-1.5 max-w-[150px] sm:max-w-[200px] px-2.5 py-2 rounded-lg border border-gray-300 hover:border-primary-400 text-sm text-gray-700 transition-colors"
-        title={hasLocation ? label : 'Set your location'}
+        title={hasLocation ? label : t('loc.set_location')}
       >
         {detecting ? (
           <Loader2 className="w-4 h-4 text-primary-600 animate-spin flex-shrink-0" />
@@ -67,7 +69,7 @@ export default function LocationSelector() {
           <MapPin className="w-4 h-4 text-primary-600 flex-shrink-0" />
         )}
         <span className="truncate">
-          {detecting ? 'Locating...' : hasLocation ? label || 'Current location' : 'Set location'}
+          {detecting ? t('loc.locating') : hasLocation ? label || t('loc.current') : t('loc.set_location_short')}
         </span>
         <ChevronDown className="w-3 h-3 text-gray-500 flex-shrink-0" />
       </button>
@@ -80,7 +82,7 @@ export default function LocationSelector() {
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search your area, village or city"
+              placeholder={t('loc.search_placeholder')}
               className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
             {query && (
@@ -90,7 +92,7 @@ export default function LocationSelector() {
             )}
           </div>
 
-          {searching && <p className="text-xs text-gray-400 mt-2 px-1">Searching...</p>}
+          {searching && <p className="text-xs text-gray-400 mt-2 px-1">{t('loc.searching')}</p>}
           {results.length > 0 && (
             <ul className="mt-2 max-h-56 overflow-y-auto divide-y divide-gray-50">
               {results.map((p) => (
@@ -104,7 +106,7 @@ export default function LocationSelector() {
             </ul>
           )}
           {!searching && query.trim().length >= 3 && results.length === 0 && (
-            <p className="text-xs text-gray-400 mt-2 px-1">No places found</p>
+            <p className="text-xs text-gray-400 mt-2 px-1">{t('loc.no_places')}</p>
           )}
 
           <button
@@ -114,7 +116,7 @@ export default function LocationSelector() {
             className="mt-3 w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-primary-700 font-medium text-sm hover:bg-primary-50 border border-primary-200 disabled:opacity-60"
           >
             {detecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Crosshair className="w-4 h-4" />}
-            {detecting ? 'Detecting your location...' : 'Detect current location'}
+            {detecting ? t('loc.detecting') : t('loc.detect')}
           </button>
 
           {error && <p className="text-xs text-red-500 mt-2 px-1">{error}</p>}

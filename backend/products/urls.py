@@ -7,6 +7,7 @@ urlpatterns = [
     path('featured/', views.FeaturedProductsView.as_view(), name='featured_products'),
     path('categories/', views.CategoryListView.as_view(), name='categories'),
     path('brands/', views.BrandListView.as_view(), name='brands'),
+    path('filter-options/', views.FilterOptionsView.as_view(), name='filter_options'),
     # Seller product management
     path('my-products/', views.SellerProductListCreateView.as_view(), name='my_products'),
     path('my-products/<int:pk>/', views.SellerProductUpdateDeleteView.as_view(), name='my_product_detail'),

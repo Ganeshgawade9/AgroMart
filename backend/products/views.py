@@ -2,7 +2,7 @@ from rest_framework import generics, status, permissions, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, F, Value, FloatField
+from django.db.models import Q, F, Value, FloatField, Count, Min, Max
 from django.db.models.functions import Cast, Cos, Sin, ACos, Radians, Least, Greatest
 import math
 from .models import Product, Category, Brand, Review, Wishlist, Cart
@@ -186,6 +186,44 @@ class BrandListView(generics.ListAPIView):
     queryset = Brand.objects.filter(is_active=True)
     serializer_class = BrandSerializer
     permission_classes = [permissions.AllowAny]
+
+
+class FilterOptionsView(APIView):
+    """Values that actually exist in the catalogue, used to build the filter panel.
+
+    Only options that have at least one active product are returned, so the
+    panel never offers a brand/unit/district that would give an empty result.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        active = Product.objects.filter(is_active=True)
+
+        def counted(qs, field):
+            return list(qs.exclude(**{f'{field}__isnull': True}).exclude(**{field: ''})
+                        .values(field).annotate(count=Count('id')).order_by(field))
+
+        categories = [
+            {'value': row['category__category_type'], 'count': row['count']}
+            for row in counted(active, 'category__category_type')
+        ]
+        brands = [
+            {'id': row['brand_id'], 'name': row['brand__name'], 'count': row['count']}
+            for row in active.exclude(brand__isnull=True)
+            .values('brand_id', 'brand__name').annotate(count=Count('id')).order_by('brand__name')
+        ]
+        units = [{'value': row['unit'], 'count': row['count']} for row in counted(active, 'unit')]
+        districts = [{'value': row['seller__district'], 'count': row['count']}
+                     for row in counted(active, 'seller__district')]
+        price = active.aggregate(min=Min('price'), max=Max('price'))
+
+        return Response({
+            'categories': categories,
+            'brands': brands,
+            'units': units,
+            'districts': districts,
+            'price': {'min': float(price['min'] or 0), 'max': float(price['max'] or 0)},
+        })
 
 
 class FeaturedProductsView(generics.ListAPIView):

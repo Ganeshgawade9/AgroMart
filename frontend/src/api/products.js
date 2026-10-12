@@ -17,3 +17,4 @@ export const clearCart = () => api.delete('/products/cart/clear/');
 export const getWishlist = () => api.get('/products/wishlist/');
 export const addToWishlist = (productId) => api.post('/products/wishlist/', { product_id: productId });
 export const removeFromWishlist = (id) => api.delete(`/products/wishlist/${id}/`);
+export const getFilterOptions = () => api.get('/products/filter-options/');

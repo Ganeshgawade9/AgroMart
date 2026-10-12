@@ -7,15 +7,17 @@ import ProductCard from '../components/products/ProductCard';
 import Spinner from '../components/common/Spinner';
 import useAuthStore from '../store/authStore';
 import useLocationStore from '../store/locationStore';
+import { useT } from '../i18n';
 import toast from 'react-hot-toast';
 
 const BANNERS = [
-  { bg: 'from-green-600 to-emerald-500', title: 'Quality Fertilizers', sub: 'Directly from verified sellers', cta: 'Shop Fertilizers', link: '/products?category_type=fertilizer' },
-  { bg: 'from-blue-600 to-cyan-500', title: 'Pesticides & Medicines', sub: 'Effective crop protection products', cta: 'Shop Pesticides', link: '/products?category_type=pesticide' },
-  { bg: 'from-orange-500 to-yellow-500', title: 'Nearby Shops', sub: 'Find sellers within your area', cta: 'View Map', link: '/nearby-shops' },
+  { bg: 'from-green-600 to-emerald-500', key: 'banner1', link: '/products?category_type=fertilizer' },
+  { bg: 'from-blue-600 to-cyan-500', key: 'banner2', link: '/products?category_type=pesticide' },
+  { bg: 'from-orange-500 to-yellow-500', key: 'banner3', link: '/nearby-shops' },
 ];
 
 export default function Home() {
+  const { t } = useT();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuthStore();
   const [featured, setFeatured] = useState([]);
@@ -59,8 +61,8 @@ export default function Home() {
       {/* Hero Banner */}
       <div className={`bg-gradient-to-r ${BANNERS[banner].bg} text-white py-16 px-4 transition-all duration-700`}>
         <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-3xl md:text-5xl font-bold mb-3">{BANNERS[banner].title}</h1>
-          <p className="text-white/80 text-lg mb-8">{BANNERS[banner].sub}</p>
+          <h1 className="text-3xl md:text-5xl font-bold mb-3">{t(`home.${BANNERS[banner].key}_title`)}</h1>
+          <p className="text-white/80 text-lg mb-8">{t(`home.${BANNERS[banner].key}_sub`)}</p>
 
           {/* Big search bar */}
           <form onSubmit={handleSearch} className="flex max-w-xl mx-auto mb-6">
@@ -69,17 +71,17 @@ export default function Home() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search Urea, DAP, NPK, Pesticide, Shop..."
+                placeholder={t('home.search_placeholder')}
                 className="flex-1 px-3 py-3 text-gray-900 outline-none text-sm"
               />
             </div>
             <button type="submit" className="bg-primary-700 hover:bg-primary-800 text-white px-6 py-3 rounded-r-xl font-semibold">
-              Search
+              {t('home.search')}
             </button>
           </form>
 
           <Link to={BANNERS[banner].link} className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white px-5 py-2.5 rounded-xl font-medium transition-colors">
-            {BANNERS[banner].cta} <ArrowRight className="w-4 h-4" />
+            {t(`home.${BANNERS[banner].key}_cta`)} <ArrowRight className="w-4 h-4" />
           </Link>
 
           {/* Banner dots */}
@@ -95,10 +97,10 @@ export default function Home() {
       <div className="bg-white border-b border-gray-100 py-4">
         <div className="max-w-7xl mx-auto px-4 flex flex-wrap justify-center gap-8">
           {[
-            { icon: <Truck className="w-5 h-5 text-primary-600" />, text: 'Fast Delivery' },
-            { icon: <Shield className="w-5 h-5 text-primary-600" />, text: 'Verified Sellers' },
-            { icon: <MapPin className="w-5 h-5 text-primary-600" />, text: 'GPS-Based Shops' },
-            { icon: <ShoppingBag className="w-5 h-5 text-primary-600" />, text: 'Easy Returns' },
+            { icon: <Truck className="w-5 h-5 text-primary-600" />, text: t('home.feat_delivery') },
+            { icon: <Shield className="w-5 h-5 text-primary-600" />, text: t('home.feat_verified') },
+            { icon: <MapPin className="w-5 h-5 text-primary-600" />, text: t('home.feat_gps') },
+            { icon: <ShoppingBag className="w-5 h-5 text-primary-600" />, text: t('home.feat_returns') },
           ].map(f => (
             <div key={f.text} className="flex items-center gap-2 text-sm font-medium text-gray-700">
               {f.icon} {f.text}
@@ -110,7 +112,7 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 py-8 space-y-12">
         {/* Categories */}
         <section>
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Shop by Category</h2>
+          <h2 className="text-xl font-bold text-gray-900 mb-4">{t('home.shop_by_category')}</h2>
           <div className="grid grid-cols-4 sm:grid-cols-7 gap-3">
             {['Fertilizer','Pesticide','Herbicide','Fungicide','Organic','Seeds','Equipment'].map((cat, i) => {
               const emojis = ['🌱','🐛','🌿','🍄','♻️','🌾','⚙️'];
@@ -118,7 +120,7 @@ export default function Home() {
                 <Link key={cat} to={`/products?category_type=${cat.toLowerCase()}`}
                   className="flex flex-col items-center gap-2 p-3 bg-white border border-gray-100 rounded-xl hover:border-primary-300 hover:bg-primary-50 transition-all group shadow-sm">
                   <span className="text-2xl">{emojis[i]}</span>
-                  <span className="text-xs font-medium text-gray-700 group-hover:text-primary-700 text-center">{cat}</span>
+                  <span className="text-xs font-medium text-gray-700 group-hover:text-primary-700 text-center">{t(`cat.${cat.toLowerCase()}`)}</span>
                 </Link>
               );
             })}
@@ -130,11 +132,11 @@ export default function Home() {
           <section className="bg-primary-50 border border-primary-100 rounded-2xl p-5 flex items-center gap-4 flex-wrap">
             <MapPin className="w-8 h-8 text-primary-600 flex-shrink-0" />
             <div className="flex-1 min-w-[220px]">
-              <h2 className="font-bold text-gray-900">See shops and products near you</h2>
-              <p className="text-sm text-gray-600">Share your location to find the nearest sellers, with distance.</p>
+              <h2 className="font-bold text-gray-900">{t('home.see_near_title')}</h2>
+              <p className="text-sm text-gray-600">{t('home.see_near_sub')}</p>
             </div>
             <button onClick={detect} disabled={detecting} className="btn-primary">
-              {detecting ? 'Detecting...' : 'Use my current location'}
+              {detecting ? t('home.detecting') : t('home.use_location')}
             </button>
           </section>
         )}
@@ -144,9 +146,9 @@ export default function Home() {
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <MapPin className="w-5 h-5 text-primary-600" /> Products near {label || 'you'}
+                <MapPin className="w-5 h-5 text-primary-600" /> {t('home.products_near', { place: label || t('home.you') })}
               </h2>
-              <Link to="/products" className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+              <Link to="/products" className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1">{t('home.view_all')} <ArrowRight className="w-3 h-3" /></Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {nearbyProducts.map(p => <ProductCard key={p.id} product={p} />)}
@@ -158,8 +160,8 @@ export default function Home() {
         {nearbyShops.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><MapPin className="w-5 h-5 text-primary-600" /> Nearby Shops</h2>
-              <Link to="/nearby-shops" className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2"><MapPin className="w-5 h-5 text-primary-600" /> {t('home.nearby_shops')}</h2>
+              <Link to="/nearby-shops" className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1">{t('home.view_all')} <ArrowRight className="w-3 h-3" /></Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {nearbyShops.map(shop => (
@@ -176,7 +178,7 @@ export default function Home() {
                     <span className="text-xs text-gray-600">{Number(shop.rating).toFixed(1)}</span>
                   </div>
                   <Link to={`/products?seller=${shop.id}`} className="mt-3 block text-center text-sm text-primary-600 font-medium border border-primary-300 rounded-lg py-1.5 hover:bg-primary-50 transition-colors">
-                    View Products
+                    {t('home.view_products')}
                   </Link>
                 </div>
               ))}
@@ -187,8 +189,8 @@ export default function Home() {
         {/* Featured Products */}
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">⭐ Featured Products</h2>
-            <Link to="/products" className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1">View all <ArrowRight className="w-3 h-3" /></Link>
+            <h2 className="text-xl font-bold text-gray-900">{t('home.featured')}</h2>
+            <Link to="/products" className="text-primary-600 text-sm font-medium hover:underline flex items-center gap-1">{t('home.view_all')} <ArrowRight className="w-3 h-3" /></Link>
           </div>
           {loadingFeatured ? (
             <div className="flex justify-center py-8"><Spinner /></div>
@@ -199,18 +201,18 @@ export default function Home() {
           ) : (
             <div className="text-center py-12 text-gray-400">
               <Leaf className="w-12 h-12 mx-auto mb-3 opacity-30" />
-              <p>Products will appear here once sellers add them.</p>
-              {!isAuthenticated && <Link to="/register" className="btn-primary inline-block mt-4">Join as Seller</Link>}
+              <p>{t('home.featured_empty')}</p>
+              {!isAuthenticated && <Link to="/register" className="btn-primary inline-block mt-4">{t('footer.join_seller')}</Link>}
             </div>
           )}
         </section>
 
         {/* CTA */}
         <section className="bg-gradient-to-r from-primary-600 to-emerald-600 rounded-2xl p-8 text-white text-center">
-          <h2 className="text-2xl font-bold mb-2">Are you a Seller?</h2>
-          <p className="text-white/80 mb-6">Register your shop and reach thousands of farmers in Maharashtra</p>
+          <h2 className="text-2xl font-bold mb-2">{t('home.cta_title')}</h2>
+          <p className="text-white/80 mb-6">{t('home.cta_sub')}</p>
           <Link to="/register" className="bg-white text-primary-700 px-6 py-3 rounded-xl font-bold hover:bg-gray-50 transition-colors inline-block">
-            Register Your Shop
+            {t('home.cta_button')}
           </Link>
         </section>
       </div>

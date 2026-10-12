@@ -5,9 +5,11 @@ import { formatPrice, IMG_PLACEHOLDER } from '../../utils/helpers';
 import { addToCart, addToWishlist, getCart } from '../../api/products';
 import useAuthStore from '../../store/authStore';
 import useCartStore from '../../store/cartStore';
+import { useT } from '../../i18n';
 import toast from 'react-hot-toast';
 
 export default function ProductCard({ product, onCartUpdate }) {
+  const { t, tOr, unit } = useT();
   const { isAuthenticated, user } = useAuthStore();
   const isFarmer = user?.role === 'farmer';
 
@@ -29,7 +31,7 @@ export default function ProductCard({ product, onCartUpdate }) {
     e.preventDefault();
 
     if (!isAuthenticated) {
-      toast.error('Please login first');
+      toast.error(t('card.login_first'));
       return;
     }
 
@@ -41,7 +43,7 @@ export default function ProductCard({ product, onCartUpdate }) {
         quantity: 1
       });
 
-      toast.success('Added to cart!');
+      toast.success(t('card.added_cart'));
 
       getCart()
         .then((r) =>
@@ -53,7 +55,7 @@ export default function ProductCard({ product, onCartUpdate }) {
 
       onCartUpdate?.();
     } catch {
-      toast.error('Failed to add to cart');
+      toast.error(t('card.add_cart_failed'));
     }
   };
 
@@ -61,15 +63,15 @@ export default function ProductCard({ product, onCartUpdate }) {
     e.preventDefault();
 
     if (!isAuthenticated) {
-      toast.error('Please login first');
+      toast.error(t('card.login_first'));
       return;
     }
 
     try {
       await addToWishlist(product.id);
-      toast.success('Added to wishlist!');
+      toast.success(t('card.added_wishlist'));
     } catch {
-      toast.error('Already in wishlist or error occurred');
+      toast.error(t('card.wishlist_failed'));
     }
   };
 
@@ -93,7 +95,7 @@ export default function ProductCard({ product, onCartUpdate }) {
         {/* Discount badge */}
         {discount > 0 && (
           <span className="absolute top-2 left-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-            {discount}% OFF
+            {t('card.off', { n: discount })}
           </span>
         )}
 
@@ -101,7 +103,7 @@ export default function ProductCard({ product, onCartUpdate }) {
         {!product.is_in_stock && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
             <span className="bg-white text-gray-800 text-sm font-semibold px-3 py-1 rounded-full">
-              Out of Stock
+              {t('card.out_of_stock')}
             </span>
           </div>
         )}
@@ -141,7 +143,7 @@ export default function ProductCard({ product, onCartUpdate }) {
       <div className="p-3 flex flex-col flex-1">
         {product.category_name && (
           <span className="text-xs text-primary-600 font-medium mb-1">
-            {product.category_name}
+            {tOr(`cat.${String(product.category_name).toLowerCase()}`, product.category_name)}
           </span>
         )}
 
@@ -189,7 +191,7 @@ export default function ProductCard({ product, onCartUpdate }) {
         {product.distance_km != null && (
           <div className="flex items-center gap-1 text-xs text-gray-500 mb-2">
             <MapPin className="w-3 h-3" />
-            {product.distance_km} km away
+            {t('card.km_away', { n: product.distance_km })}
           </div>
         )}
 
@@ -212,13 +214,13 @@ export default function ProductCard({ product, onCartUpdate }) {
             {product.has_free_delivery && (
               <span className="flex items-center gap-0.5 text-xs text-green-600 font-medium">
                 <Truck className="w-3 h-3" />
-                Free
+                {t('card.free')}
               </span>
             )}
 
             {product.unit && (
               <span className="text-xs text-gray-500">
-                / {product.weight || product.unit}
+                / {product.weight || unit(product.unit)}
               </span>
             )}
           </div>
@@ -232,7 +234,7 @@ export default function ProductCard({ product, onCartUpdate }) {
                 className="mt-2 w-full flex items-center justify-center gap-1.5 bg-primary-600 text-white py-1.5 rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
               >
                 <ShoppingCart className="w-4 h-4" />
-                Add to Cart
+                {t('card.add_to_cart')}
               </button>
             )}
         </div>

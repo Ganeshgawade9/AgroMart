@@ -7,9 +7,12 @@ import { logout } from '../../api/auth';
 import { getCart } from '../../api/products';
 import { getNotifications } from '../../api/notifications';
 import LocationSelector from './LocationSelector';
+import LanguageSwitcher from './LanguageSwitcher';
+import { useT } from '../../i18n';
 import toast from 'react-hot-toast';
 
 export default function Navbar() {
+  const { t } = useT();
   const { user, isAuthenticated, logout: storeLogout, refreshToken } = useAuthStore();
   const { count, setCart } = useCartStore();
   const navigate = useNavigate();
@@ -33,7 +36,7 @@ export default function Navbar() {
   const handleLogout = async () => {
     try { await logout(refreshToken); } catch { }
     storeLogout();
-    toast.success('Logged out');
+    toast.success(t('nav.logged_out'));
     navigate('/');
   };
 
@@ -67,7 +70,7 @@ export default function Navbar() {
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                placeholder="Search Urea, DAP, Pesticide, Shop name..."
+                placeholder={t('nav.search_placeholder')}
                 className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 text-sm"
               />
             </div>
@@ -75,13 +78,14 @@ export default function Navbar() {
 
           {/* Nav links */}
           <div className="hidden md:flex items-center gap-1">
-            <Link to="/products" className="text-gray-600 hover:text-primary-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">Products</Link>
+            <Link to="/products" className="text-gray-600 hover:text-primary-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">{t('nav.products')}</Link>
             <Link to="/nearby-shops" className="flex items-center gap-1 text-gray-600 hover:text-primary-600 px-3 py-2 rounded-lg text-sm font-medium transition-colors">
-              <MapPin className="w-4 h-4" /> Nearby
+              <MapPin className="w-4 h-4" /> {t('nav.nearby')}
             </Link>
           </div>
 
           <div className="flex items-center gap-2 ml-auto">
+            <LanguageSwitcher />
             {isAuthenticated ? (
               <>
                 {user?.role === 'farmer' && (
@@ -110,19 +114,19 @@ export default function Navbar() {
                   {profileOpen && (
                     <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-1 z-50">
                       <Link to={getDashboardLink()} className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setProfileOpen(false)}>
-                        <Package className="w-4 h-4" /> Dashboard
+                        <Package className="w-4 h-4" /> {t('nav.dashboard')}
                       </Link>
                       <Link to="/profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setProfileOpen(false)}>
-                        <User className="w-4 h-4" /> User Profile
+                        <User className="w-4 h-4" /> {t('nav.profile')}
                       </Link>
                       {user?.role === 'seller' && (
                         <Link to="/seller/shop-profile" className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setProfileOpen(false)}>
-                          <Store className="w-4 h-4" /> Shop Profile
+                          <Store className="w-4 h-4" /> {t('nav.shop_profile')}
                         </Link>
                       )}
                       <hr className="my-1 border-gray-100" />
                       <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full">
-                        <LogOut className="w-4 h-4" /> Logout
+                        <LogOut className="w-4 h-4" /> {t('nav.logout')}
                       </button>
                     </div>
                   )}
@@ -130,8 +134,8 @@ export default function Navbar() {
               </>
             ) : (
               <div className="flex items-center gap-2">
-                <Link to="/login" className="btn-secondary text-sm py-1.5 px-3">Login</Link>
-                <Link to="/register" className="btn-primary text-sm py-1.5 px-3 hidden sm:block">Register</Link>
+                <Link to="/login" className="btn-secondary text-sm py-1.5 px-3">{t('nav.login')}</Link>
+                <Link to="/register" className="btn-primary text-sm py-1.5 px-3 hidden sm:block">{t('nav.register')}</Link>
               </div>
             )}
             <button onClick={() => setMobileOpen(!mobileOpen)} className="md:hidden p-2 text-gray-600">
@@ -143,7 +147,7 @@ export default function Navbar() {
         {/* Categories bar */}
         <div className="hidden md:flex items-center gap-6 py-2 text-sm overflow-x-auto">
           {['Fertilizer', 'Pesticide', 'Herbicide', 'Fungicide', 'Organic', 'Seeds', 'Equipment'].map(cat => (
-            <Link key={cat} to={`/products?category_type=${cat.toLowerCase()}`} className="text-gray-600 hover:text-primary-600 whitespace-nowrap font-medium">{cat}</Link>
+            <Link key={cat} to={`/products?category_type=${cat.toLowerCase()}`} className="text-gray-600 hover:text-primary-600 whitespace-nowrap font-medium">{t(`cat.${cat.toLowerCase()}`)}</Link>
           ))}
         </div>
       </div>
@@ -151,9 +155,9 @@ export default function Navbar() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-gray-100 bg-white py-3 px-4 flex flex-col gap-2">
-          <Link to="/products" className="text-gray-700 py-2 font-medium" onClick={() => setMobileOpen(false)}>All Products</Link>
-          <Link to="/nearby-shops" className="text-gray-700 py-2 font-medium" onClick={() => setMobileOpen(false)}>Nearby Shops</Link>
-          {!isAuthenticated && <Link to="/register" className="btn-primary text-center mt-2" onClick={() => setMobileOpen(false)}>Register</Link>}
+          <Link to="/products" className="text-gray-700 py-2 font-medium" onClick={() => setMobileOpen(false)}>{t('nav.all_products')}</Link>
+          <Link to="/nearby-shops" className="text-gray-700 py-2 font-medium" onClick={() => setMobileOpen(false)}>{t('nav.nearby_shops')}</Link>
+          {!isAuthenticated && <Link to="/register" className="btn-primary text-center mt-2" onClick={() => setMobileOpen(false)}>{t('nav.register')}</Link>}
         </div>
       )}
     </nav>

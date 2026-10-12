@@ -3,9 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Leaf, Eye, EyeOff } from 'lucide-react';
 import { login } from '../../api/auth';
 import useAuthStore from '../../store/authStore';
+import { useT } from '../../i18n';
 import toast from 'react-hot-toast';
 
 export default function Login() {
+  const { t } = useT();
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
   const [form, setForm] = useState({ email: '', password: '' });
@@ -27,12 +29,12 @@ export default function Login() {
       const user = data.user;
 
       if (!access || !user) {
-        toast.error('Unexpected server response. Please try again.');
+        toast.error(t('login.unexpected'));
         return;
       }
 
       setAuth(user, access, refresh);
-      toast.success(`Welcome back, ${user.full_name?.split(' ')[0] || 'User'}!`);
+      toast.success(t('login.welcome_user', { name: user.full_name?.split(' ')[0] || 'User' }));
 
       const dashMap = {
         farmer: '/farmer/dashboard',
@@ -45,7 +47,7 @@ export default function Login() {
       console.error('Login error:', err.response?.data);
       // Show exact error from backend
       const errData = err.response?.data;
-      let msg = 'Login failed. Check credentials.';
+      let msg = t('login.failed');
       if (errData?.detail) msg = errData.detail;
       else if (errData?.non_field_errors) msg = errData.non_field_errors[0];
       else if (typeof errData === 'string') msg = errData;
@@ -64,12 +66,12 @@ export default function Login() {
           </div>
           <span className="font-bold text-2xl text-primary-700">AgroConnect</span>
         </div>
-        <h1 className="text-xl font-bold text-gray-900 text-center mb-1">Welcome Back</h1>
-        <p className="text-gray-500 text-sm text-center mb-6">Login to your account</p>
+        <h1 className="text-xl font-bold text-gray-900 text-center mb-1">{t('login.welcome')}</h1>
+        <p className="text-gray-500 text-sm text-center mb-6">{t('login.subtitle')}</p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Email</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">{t('login.email')}</label>
             <input
               className="input"
               type="email"
@@ -80,7 +82,7 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 block mb-1">Password</label>
+            <label className="text-sm font-medium text-gray-700 block mb-1">{t('login.password')}</label>
             <div className="relative">
               <input
                 className="input pr-10"
@@ -101,23 +103,23 @@ export default function Login() {
           </div>
           <div className="text-right -mt-2">
             <Link to="/forgot-password" className="text-sm text-primary-600 font-medium hover:underline">
-              Forgot password?
+              {t('login.forgot')}
             </Link>
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full py-2.5 text-base">
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? t('login.submitting') : t('login.submit')}
           </button>
         </form>
 
         {/* Quick login helper for testing */}
         <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
-          <p className="text-xs font-semibold text-gray-600 mb-2">🧪 Quick Test Login:</p>
+          <p className="text-xs font-semibold text-gray-600 mb-2">{t('login.quick_title')}</p>
           <div className="grid grid-cols-2 gap-1.5">
             {[
-              { label: '🌾 Farmer', email: 'farmer@agroconnect.in', pass: 'farmer123' },
-              { label: '🏪 Seller', email: 'ganesh@agroconnect.in', pass: 'seller123' },
-              { label: '🚚 Delivery', email: 'delivery@agroconnect.in', pass: 'delivery123' },
-              { label: '🔧 Admin', email: 'admin@agroconnect.in', pass: 'admin123' },
+              { label: t('login.role_farmer'), email: 'farmer@agroconnect.in', pass: 'farmer123' },
+              { label: t('login.role_seller'), email: 'ganesh@agroconnect.in', pass: 'seller123' },
+              { label: t('login.role_delivery'), email: 'delivery@agroconnect.in', pass: 'delivery123' },
+              { label: t('login.role_admin'), email: 'admin@agroconnect.in', pass: 'admin123' },
             ].map(u => (
               <button
                 key={u.email}
@@ -129,13 +131,13 @@ export default function Login() {
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-400 mt-1.5">Click to fill credentials, then Login</p>
+          <p className="text-xs text-gray-400 mt-1.5">{t('login.quick_hint')}</p>
         </div>
 
         <p className="text-center text-sm text-gray-600 mt-4">
-          Don't have an account?{' '}
+          {t('login.no_account')}{' '}
           <Link to="/register" className="text-primary-600 font-semibold hover:underline">
-            Register
+            {t('login.register')}
           </Link>
         </p>
       </div>
