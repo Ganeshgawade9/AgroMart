@@ -256,3 +256,47 @@ class HandoverOtpTests(TestCase):
         self.assertNotIn('pickup_otp', api(self.rider).get(url).json())
         for user in (self.seller, self.farmer, self.rider):
             self.assertNotIn('pickup_otp_attempts', api(user).get(url).json())
+
+
+class StockRestoreOnCancelTests(TestCase):
+    def setUp(self):
+        self.seller = User.objects.create_user(email='shop2@example.com', password='x', full_name='Shop', role='seller')
+        self.farmer = User.objects.create_user(email='farmer2@example.com', password='x', full_name='Farmer', role='farmer')
+        category = Category.objects.create(name='Fert', slug='fert2', category_type='fertilizer')
+        self.product = Product.objects.create(
+            seller=self.seller, category=category, name='Urea', description='d', image='x.png',
+            price=100, mrp=120, stock=10)
+        self.order = Order.objects.create(
+            farmer=self.farmer, seller=self.seller, subtotal=300, total=305, payment_method='cod',
+            delivery_address='Farm road', delivery_phone='9999999999', delivery_otp='123456')
+        OrderItem.objects.create(order=self.order, product=self.product, quantity=3)
+        # Placing the order reserved 3 units
+        Product.objects.filter(pk=self.product.pk).update(stock=7)
+
+    def set_status(self, status):
+        return api(self.seller).post(f'/api/orders/{self.order.id}/update-status/', {'status': status}, format='json')
+
+    def test_cancelling_returns_stock(self):
+        response = self.set_status('cancelled')
+        self.assertEqual(response.status_code, 200)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 10)
+
+    def test_a_sold_out_product_is_available_again_after_cancel(self):
+        Product.objects.filter(pk=self.product.pk).update(stock=0)
+        self.set_status('cancelled')
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 3)
+        self.assertTrue(self.product.is_in_stock)
+
+    def test_accepting_does_not_change_stock(self):
+        self.set_status('accepted')
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 7)
+
+    def test_stock_is_returned_only_once(self):
+        self.set_status('cancelled')
+        second = self.set_status('cancelled')
+        self.assertEqual(second.status_code, 400)
+        self.product.refresh_from_db()
+        self.assertEqual(self.product.stock, 10)

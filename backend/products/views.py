@@ -2,7 +2,7 @@ from rest_framework import generics, status, permissions, filters
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from django.db.models import Q, F, Value, FloatField, Count, Min, Max
+from django.db.models import Q, F, Value, FloatField, IntegerField, Case, When, Count, Min, Max
 from django.db.models.functions import Cast, Cos, Sin, ACos, Radians, Least, Greatest
 import math
 from .models import Product, Category, Brand, Review, Wishlist, Cart
@@ -35,6 +35,19 @@ def distance_expression(lat, lng):
     return ACos(clamped, output_field=f) * Value(6371.0, output_field=f)
 
 
+def with_sold_out_flag(queryset):
+    """Adds `sold_out` (1 when stock is 0) so listings can push sold-out items to the end."""
+    return queryset.annotate(
+        sold_out=Case(When(stock__lte=0, then=1), default=0, output_field=IntegerField())
+    )
+
+
+def sold_out_last(queryset):
+    """Keeps whatever ordering was chosen, but lists sold-out products after the available ones."""
+    current = list(queryset.query.order_by) or list(Product._meta.ordering)
+    return queryset.order_by('sold_out', *current)
+
+
 class IsSellerOrReadOnly(permissions.BasePermission):
     def has_permission(self, request, view):
         if request.method in permissions.SAFE_METHODS:
@@ -58,7 +71,9 @@ class ProductListView(generics.ListAPIView):
     ordering = ['-created_at']
 
     def get_queryset(self):
-        qs = Product.objects.filter(is_active=True).select_related('seller', 'seller__seller_profile', 'category', 'brand')
+        qs = with_sold_out_flag(
+            Product.objects.filter(is_active=True).select_related('seller', 'seller__seller_profile', 'category', 'brand')
+        )
 
         # Nearby products filter
         lat = self.request.query_params.get('lat')
@@ -88,6 +103,10 @@ class ProductListView(generics.ListAPIView):
             qs = qs.annotate(distance=Value(None, output_field=FloatField()))
 
         return qs
+
+    def filter_queryset(self, queryset):
+        # Sold-out products stay visible (with a "Sold out" label) but come after the available ones
+        return sold_out_last(super().filter_queryset(queryset))
 
 
 class ProductDetailView(generics.RetrieveAPIView):
@@ -227,6 +246,9 @@ class FilterOptionsView(APIView):
 
 
 class FeaturedProductsView(generics.ListAPIView):
-    queryset = Product.objects.filter(is_active=True, is_featured=True)
     serializer_class = ProductListSerializer
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = with_sold_out_flag(Product.objects.filter(is_active=True, is_featured=True))
+        return sold_out_last(qs)

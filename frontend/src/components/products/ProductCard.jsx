@@ -8,6 +8,8 @@ import useCartStore from '../../store/cartStore';
 import { useT } from '../../i18n';
 import toast from 'react-hot-toast';
 
+const LOW_STOCK = 5;
+
 export default function ProductCard({ product, onCartUpdate }) {
   const { t, tOr, unit } = useT();
   const { isAuthenticated, user } = useAuthStore();
@@ -85,7 +87,7 @@ export default function ProductCard({ product, onCartUpdate }) {
         <img
           src={images[activeImg] || IMG_PLACEHOLDER}
           alt={product.name}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          className={`w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 ${product.is_in_stock ? '' : 'grayscale opacity-70'}`}
           onError={(e) => {
             e.currentTarget.onerror = null;
             e.currentTarget.src = IMG_PLACEHOLDER;
@@ -99,13 +101,20 @@ export default function ProductCard({ product, onCartUpdate }) {
           </span>
         )}
 
-        {/* Out of stock overlay */}
+        {/* Sold out overlay: the product stays visible but cannot be bought */}
         {!product.is_in_stock && (
           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <span className="bg-white text-gray-800 text-sm font-semibold px-3 py-1 rounded-full">
-              {t('card.out_of_stock')}
+            <span className="bg-white text-gray-800 text-sm font-bold uppercase tracking-wide px-3 py-1 rounded-full">
+              {t('card.sold_out')}
             </span>
           </div>
+        )}
+
+        {/* Limited stock warning */}
+        {product.is_in_stock && product.stock > 0 && product.stock <= LOW_STOCK && (
+          <span className="absolute bottom-2 left-2 bg-orange-500 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+            {t('card.only_left', { n: product.stock })}
+          </span>
         )}
 
         {/* Wishlist button */}
@@ -224,6 +233,18 @@ export default function ProductCard({ product, onCartUpdate }) {
               </span>
             )}
           </div>
+
+          {/* Sold out products get a disabled button instead of Add to Cart */}
+          {isAuthenticated && isFarmer && !product.is_in_stock && (
+            <button
+              type="button"
+              disabled
+              onClick={(e) => e.preventDefault()}
+              className="mt-2 w-full bg-gray-200 text-gray-500 py-1.5 rounded-lg text-sm font-semibold cursor-not-allowed"
+            >
+              {t('card.sold_out')}
+            </button>
+          )}
 
           {/* Add to Cart */}
           {isAuthenticated &&

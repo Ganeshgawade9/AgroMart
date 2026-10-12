@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MapPin, Search, ArrowRight, Star, ShoppingBag, Truck, Shield, Leaf } from 'lucide-react';
 import { getFeatured, getCategories, getProducts } from '../api/products';
@@ -8,6 +8,7 @@ import Spinner from '../components/common/Spinner';
 import useAuthStore from '../store/authStore';
 import useLocationStore from '../store/locationStore';
 import { useT } from '../i18n';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import toast from 'react-hot-toast';
 
 const BANNERS = [
@@ -46,10 +47,21 @@ export default function Home() {
     getNearbyShops(lat, lng, 20)
       .then(r => setNearbyShops(r.data.shops?.slice(0, 6) || []))
       .catch(() => setNearbyShops([]));
-    getProducts({ lat, lng, radius: 20, ordering: 'distance', in_stock: 'true' })
+    getProducts({ lat, lng, radius: 20, ordering: 'distance' })
       .then(r => setNearbyProducts((r.data.results || r.data).slice(0, 10)))
       .catch(() => setNearbyProducts([]));
   }, [lat, lng]);
+
+  // Keep featured and nearby products (stock, price, sold-out state) live without a reload
+  const refreshProducts = useCallback(() => {
+    getFeatured().then(r => setFeatured(r.data.results || r.data)).catch(() => {});
+    if (lat != null && lng != null) {
+      getProducts({ lat, lng, radius: 20, ordering: 'distance' })
+        .then(r => setNearbyProducts((r.data.results || r.data).slice(0, 10)))
+        .catch(() => {});
+    }
+  }, [lat, lng]);
+  useAutoRefresh(refreshProducts);
 
   const handleSearch = (e) => {
     e.preventDefault();

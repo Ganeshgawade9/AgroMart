@@ -8,6 +8,7 @@ from .models import Order, OrderItem, Invoice
 from .serializers import OrderCreateSerializer, OrderListSerializer, OrderDetailSerializer, DeliveryOrderSerializer
 from . import dispatch
 from . import otp as otp_service
+from .stock import restore_stock
 from products.models import Product, Cart
 from notifications.utils import send_notification
 
@@ -207,6 +208,8 @@ class UpdateOrderStatusView(APIView):
                 otp_service.send_otp(order, otp_service.DELIVERY)
             elif new_status == Order.CANCELLED:
                 dispatch.cancel_open_offers(order)
+                # The order reserved stock when it was placed; give it back
+                restore_stock(order)
             return Response({'message': f'Order status updated to {new_status}'})
 
         except Order.DoesNotExist:

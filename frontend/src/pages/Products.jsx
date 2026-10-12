@@ -7,6 +7,7 @@ import FilterSidebar from '../components/products/FilterSidebar';
 import Spinner from '../components/common/Spinner';
 import useLocationStore from '../store/locationStore';
 import { useT } from '../i18n';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import { EMPTY_FILTERS, buildFilterParams, countActiveFilters, parseList } from '../utils/filters';
 import toast from 'react-hot-toast';
 
@@ -59,8 +60,9 @@ export default function Products() {
     getFilterOptions().then((r) => setOptions(r.data)).catch(() => setOptions(null));
   }, []);
 
-  const fetchProducts = useCallback(async () => {
-    setLoading(true);
+  // `silent` refreshes keep the grid on screen (no spinner) and stay quiet on errors
+  const fetchProducts = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const params = { ...buildFilterParams(filters), page, ordering };
       if (searchQuery) params.search = searchQuery;
@@ -76,14 +78,17 @@ export default function Products() {
       setProducts(res.data.results || res.data);
       setTotal(res.data.count || 0);
     } catch {
-      toast.error(t('products.load_failed'));
+      if (!silent) toast.error(t('products.load_failed'));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters, page, ordering, searchQuery, sellerId, useNearby, lat, lng, radius]);
 
   useEffect(() => { fetchProducts(); }, [fetchProducts]);
+
+  // Stock and prices change as sellers update them and orders come in: refresh without a reload
+  useAutoRefresh(() => fetchProducts(true), { enabled: !loading });
 
   const handleNearbyToggle = async () => {
     if (!hasLocation) {
@@ -116,6 +121,10 @@ export default function Products() {
           {!loading && (
             <p className="text-gray-500 text-sm mt-0.5 flex items-center gap-1 flex-wrap">
               {t('products.found', { n: total })}
+              <span className="inline-flex items-center gap-1 text-xs text-green-700 ml-1" title={t('products.live')}>
+                <span className="relative flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" /><span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" /></span>
+                {t('products.live')}
+              </span>
               {useNearby && (
                 <span className="inline-flex items-center gap-1 text-primary-700">
                   · <MapPin className="w-3.5 h-3.5" /> {t('products.within', { r: radius, place: label || t('products.your_location') })}

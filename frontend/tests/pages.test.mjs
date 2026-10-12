@@ -43,8 +43,8 @@ const PRODUCT = {
 
 const RAW_KEY = /\b(nav|home|products|filters|card|login|forgot|footer|loc|sort|cat|unit|district|lang)\.[a-z_0-9]+\b/;
 const LEAKS = {
-  hi: ['Forgot password', 'Add to Cart', 'Out of Stock', 'Verified Sellers', 'Shop by Category', 'Quick Links', 'Welcome Back'],
-  mr: ['Forgot password', 'Add to Cart', 'Out of Stock', 'Verified Sellers', 'Shop by Category', 'Quick Links', 'Welcome Back'],
+  hi: ['Forgot password', 'Add to Cart', 'Sold Out', 'Verified Sellers', 'Shop by Category', 'Quick Links', 'Welcome Back'],
+  mr: ['Forgot password', 'Add to Cart', 'Sold Out', 'Verified Sellers', 'Shop by Category', 'Quick Links', 'Welcome Back'],
 };
 
 async function render(element, route = '/') {

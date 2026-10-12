@@ -121,6 +121,9 @@ const en = {
   'products.next': 'Next →',
   'products.page_of': 'Page {page} of {pages}',
   'products.load_failed': 'Failed to load products',
+  'products.live': 'Updates automatically',
+  'detail.in_stock': '✓ In Stock ({n} {unit} available)',
+  'detail.sold_out': '✗ Sold Out — currently unavailable',
   'products.location_failed': 'Could not get your location',
   'products.filters': 'Filters',
   'products.show_results': 'Show {n} products',
@@ -151,7 +154,7 @@ const en = {
   'filters.special_price': 'Special Price (below MRP)',
   'filters.availability': 'Availability',
   'filters.in_stock': 'In Stock only',
-  'filters.out_of_stock': 'Out of Stock only',
+  'filters.out_of_stock': 'Sold Out only',
   'filters.delivery': 'Delivery',
   'filters.free_delivery': 'Free Delivery',
   'filters.type': 'Product Type',
@@ -169,7 +172,8 @@ const en = {
 
   // Product card
   'card.off': '{n}% OFF',
-  'card.out_of_stock': 'Out of Stock',
+  'card.sold_out': 'Sold Out',
+  'card.only_left': 'Only {n} left',
   'card.free': 'Free',
   'card.km_away': '{n} km away',
   'card.add_to_cart': 'Add to Cart',

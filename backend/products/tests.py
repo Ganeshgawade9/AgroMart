@@ -122,3 +122,53 @@ class FilterOptionsTests(TestCase):
         self.assertEqual([u['value'] for u in data['units']], ['bag'])
         self.assertEqual([d['value'] for d in data['districts']], ['Pune'])
         self.assertEqual(data['price'], {'min': 100.0, 'max': 100.0})
+
+
+class SoldOutListingTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        seller = User.objects.create_user(email='s@example.com', password='x', full_name='S', role='seller')
+        cat = Category.objects.create(name='Fertilizer', slug='fert', category_type='fertilizer')
+
+        def make(name, price, stock, **kw):
+            return Product.objects.create(seller=seller, category=cat, name=name, description='d',
+                                          image='x.png', price=price, mrp=price, stock=stock, **kw)
+
+        # Newest first by default: Gone (sold out) is the newest, then Cheap, then Dear
+        cls.dear = make('Dear', 900, 4)
+        cls.cheap = make('Cheap', 100, 7)
+        cls.gone = make('Gone', 50, 0, is_featured=True)
+        cls.also_gone = make('AlsoGone', 60, 0)
+        now = timezone.now()
+        for offset, product in enumerate([cls.dear, cls.cheap, cls.also_gone, cls.gone]):
+            Product.objects.filter(pk=product.pk).update(created_at=now - timedelta(days=10 - offset))
+        cls.featured = make('Featured', 10, 3, is_featured=True)
+
+    def names(self, **params):
+        response = APIClient().get(URL, params)
+        self.assertEqual(response.status_code, 200)
+        return [p['name'] for p in response.data['results']]
+
+    def test_sold_out_products_are_still_listed(self):
+        self.assertEqual(len(self.names()), 5)
+        flags = {p['name']: p['is_in_stock'] for p in APIClient().get(URL).data['results']}
+        self.assertFalse(flags['Gone'])
+        self.assertTrue(flags['Cheap'])
+
+    def test_sold_out_come_last_with_default_ordering(self):
+        # Newest first among the available ones, then the sold-out ones (also newest first)
+        self.assertEqual(self.names(), ['Featured', 'Cheap', 'Dear', 'Gone', 'AlsoGone'])
+
+    def test_sold_out_come_last_whatever_the_sort(self):
+        # The sold-out Gone (₹50) would be cheapest, but must still come after the available ones
+        self.assertEqual(self.names(ordering='price'), ['Featured', 'Cheap', 'Dear', 'Gone', 'AlsoGone'])
+        self.assertEqual(self.names(ordering='-price'), ['Dear', 'Cheap', 'Featured', 'AlsoGone', 'Gone'])
+
+    def test_availability_filter_can_still_isolate_sold_out(self):
+        self.assertEqual(sorted(self.names(in_stock='false')), ['AlsoGone', 'Gone'])
+
+    def test_featured_list_also_puts_sold_out_last(self):
+        response = APIClient().get('/api/products/featured/')
+        self.assertEqual(response.status_code, 200)
+        results = response.data['results'] if isinstance(response.data, dict) else response.data
+        self.assertEqual([p['name'] for p in results], ['Featured', 'Gone'])

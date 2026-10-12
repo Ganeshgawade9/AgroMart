@@ -1,4 +1,6 @@
 import { useState, useEffect } from 'react';
+import useAutoRefresh from '../hooks/useAutoRefresh';
+import { useT } from '../i18n';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
   ShoppingCart,
@@ -49,6 +51,7 @@ export default function ProductDetail() {
 
   const [submittingReview, setSubmittingReview] = useState(false);
   const [addingCart, setAddingCart] = useState(false);
+  const { t } = useT();
 
   useEffect(() => {
     setLoading(true);
@@ -64,6 +67,16 @@ export default function ProductDetail() {
         setLoading(false);
       });
   }, [id]);
+
+  // Stock can change while the page is open (other farmers ordering, seller restocking)
+  useAutoRefresh(() => {
+    getProduct(id)
+      .then((r) => {
+        setProduct(r.data);
+        setQty((q) => Math.max(1, Math.min(q, r.data.stock || 1)));
+      })
+      .catch(() => {});
+  }, { enabled: !loading });
 
   if (loading) {
     return (
@@ -332,8 +345,8 @@ export default function ProductDetail() {
                 }`}
             >
               {product.is_in_stock
-                ? `✓ In Stock (${product.stock} ${product.unit} available)`
-                : '✗ Out of Stock'}
+                ? t('detail.in_stock', { n: product.stock, unit: product.unit })
+                : t('detail.sold_out')}
             </span>
 
           </div>
