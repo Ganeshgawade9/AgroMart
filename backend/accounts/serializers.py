@@ -1,14 +1,29 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from notifications.sms import normalize_phone
 from .models import SellerProfile, FarmerProfile
 
 User = get_user_model()
+
+PHONE_ERROR = 'Enter a valid 10-digit Indian mobile number (starting with 6-9). OTPs are sent to this number.'
+
+
+def clean_mobile(value):
+    """Return the 10-digit mobile number, or raise a validation error."""
+    number = normalize_phone(value)
+    if not number:
+        raise serializers.ValidationError(PHONE_ERROR)
+    return number
 
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, min_length=6)
     password2 = serializers.CharField(write_only=True)
     shop_name = serializers.CharField(required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=20, error_messages={'required': PHONE_ERROR, 'blank': PHONE_ERROR})
+
+    def validate_phone(self, value):
+        return clean_mobile(value)
 
     class Meta:
         model = User
@@ -44,6 +59,10 @@ class RegisterSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     seller_profile = serializers.SerializerMethodField()
     farmer_profile = serializers.SerializerMethodField()
+
+    def validate_phone(self, value):
+        # The mobile number is where OTPs go, so it cannot be blanked or set to something unusable
+        return clean_mobile(value)
 
     class Meta:
         model = User

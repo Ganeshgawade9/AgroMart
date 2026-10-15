@@ -30,7 +30,11 @@ export default function Profile() {
       const res = await updateProfile(form);
       updateUser(res.data);
       toast.success('Profile updated!');
-    } catch { toast.error('Failed to update'); } finally { setSaving(false); }
+    } catch (err) {
+      const errors = err.response?.data;
+      const message = errors && typeof errors === 'object' ? Object.values(errors).flat().join(', ') : '';
+      toast.error(message || 'Failed to update');
+    } finally { setSaving(false); }
   };
 
   if (loading || !form) return <div className="flex justify-center py-20"><Spinner /></div>;
@@ -61,8 +65,9 @@ export default function Profile() {
               <input className="input" value={form.full_name || ''} onChange={e => set('full_name', e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Phone</label>
-              <input className="input" value={form.phone || ''} onChange={e => set('phone', e.target.value)} />
+              <label className="text-sm font-medium text-gray-700 block mb-1">Mobile number</label>
+              <input className="input" type="tel" inputMode="numeric" placeholder="9876543210" value={form.phone || ''} onChange={e => set('phone', e.target.value)} />
+              <p className="text-xs text-gray-500 mt-1">OTPs are sent to this number.</p>
             </div>
           </div>
           <div>

@@ -248,6 +248,27 @@ class HandoverOtpTests(TestCase):
         self.order.refresh_from_db()
         self.assertEqual(self.order.status, Order.DELIVERED)
 
+    def test_delivery_otp_goes_to_the_registered_number_not_the_checkout_contact_number(self):
+        Order.objects.filter(pk=self.order.pk).update(status=Order.OUT_FOR_DELIVERY, delivery_phone='9111111111')
+        with mock.patch('orders.otp.send_sms') as sms:
+            self.assertEqual(api(self.farmer).post(f'/api/orders/{self.order.id}/resend-delivery-otp/').status_code, 200)
+        self.assertEqual(sms.call_args.args[0], self.farmer.phone)
+        self.assertNotEqual(sms.call_args.args[0], '9111111111')
+
+    def test_delivery_otp_is_not_redirected_when_the_registered_number_is_unusable(self):
+        User.objects.filter(pk=self.farmer.pk).update(phone='12345')
+        Order.objects.filter(pk=self.order.pk).update(status=Order.OUT_FOR_DELIVERY, delivery_phone='9111111111')
+        with mock.patch('notifications.sms.urllib.request.urlopen') as urlopen, \
+                self.settings(SMS_BACKEND='fast2sms', FAST2SMS_API_KEY='key'):
+            response = api(self.farmer).post(f'/api/orders/{self.order.id}/resend-delivery-otp/')
+        self.assertFalse(urlopen.called)  # nothing is sent to the checkout number
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('could not be sent', response.json()['message'])
+
+    def test_pickup_otp_goes_to_the_sellers_registered_number(self):
+        sms = self.pack()
+        self.assertEqual(sms.call_args.args[0], self.seller.phone)
+
     def test_pickup_otp_visible_only_to_the_seller(self):
         self.pack()
         url = f'/api/orders/{self.order.id}/'

@@ -97,3 +97,52 @@ class PasswordResetOtpTests(TestCase):
             'identifier': 'farmer@example.com', 'otp': self.code_from(sms),
             'new_password': 'newpass1', 'new_password2': 'different'}, format='json')
         self.assertEqual(response.status_code, 400)
+
+
+class MobileNumberRulesTests(TestCase):
+    """OTPs go to the number the user registered with, so that number must be a real mobile."""
+
+    def register(self, **overrides):
+        body = {'email': 'new@example.com', 'password': 'secret12', 'password2': 'secret12',
+                'full_name': 'New User', 'role': 'farmer', 'phone': '9876543210'}
+        body.update(overrides)
+        body = {k: v for k, v in body.items() if v is not None}
+        return APIClient().post('/api/auth/register/', body, format='json')
+
+    def test_registration_requires_a_mobile_number(self):
+        self.assertEqual(self.register(phone=None).status_code, 400)
+        self.assertEqual(self.register(phone='').status_code, 400)
+
+    def test_registration_rejects_numbers_that_cannot_receive_sms(self):
+        for bad in ('12345', '1234567890', '98765', '0141-2345678'):
+            response = self.register(phone=bad)
+            self.assertEqual(response.status_code, 400, bad)
+            self.assertIn('phone', response.json())
+
+    def test_registration_stores_the_clean_ten_digit_number(self):
+        response = self.register(phone='+91 98765-43210')
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(User.objects.get(email='new@example.com').phone, '9876543210')
+
+    def test_every_role_must_give_a_mobile_number(self):
+        for role, extra in (('seller', {'shop_name': 'Shop'}), ('delivery', {})):
+            response = self.register(email=f'{role}@example.com', role=role, phone=None, **extra)
+            self.assertEqual(response.status_code, 400, role)
+
+    def test_profile_update_keeps_the_number_valid(self):
+        user = User.objects.create_user(email='u@example.com', password='x', full_name='U', role='farmer', phone='9876543210')
+        client = APIClient()
+        client.force_authenticate(user)
+        for bad in ('', '123', 'not a number'):
+            self.assertEqual(client.patch('/api/auth/profile/', {'phone': bad}, format='json').status_code, 400, bad)
+        response = client.patch('/api/auth/profile/', {'phone': '09123456789'}, format='json')
+        self.assertEqual(response.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual(user.phone, '9123456789')
+
+    def test_reset_otp_goes_only_to_the_registered_number(self):
+        user = User.objects.create_user(email='r@example.com', password='x', full_name='R', role='farmer', phone='9876543210')
+        with mock.patch('accounts.otp.send_sms') as sms:
+            APIClient().post('/api/auth/forgot-password/', {'identifier': user.email}, format='json')
+        sms.assert_called_once()
+        self.assertEqual(sms.call_args.args[0], '9876543210')
