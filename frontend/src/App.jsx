@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Navbar from './components/common/Navbar';
 import Footer from './components/common/Footer';
@@ -46,6 +46,9 @@ import AdminDashboard from './pages/admin/Dashboard';
 import DeliveryDashboard from './pages/delivery/Dashboard';
 
 export default function App() {
+  const location = useLocation();
+  const hideFooter = ['/login', '/register', '/forgot-password'].includes(location.pathname);
+
   return (
     <>
       <Toaster
@@ -104,7 +107,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>
-        <Footer />
+        {!hideFooter && <Footer />}
       </div>
 
       {/* AI Chatbot - visible on all pages */}

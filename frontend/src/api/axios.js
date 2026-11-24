@@ -1,5 +1,27 @@
 import axios from 'axios';
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+// Detect whether running inside mobile Capacitor app
+const isNativePlatform = () => {
+  if (typeof window === 'undefined') return false;
+  return (
+    window.location.protocol === 'capacitor:' ||
+    (window.location.hostname === 'localhost' && /Android|iPhone|iPad/i.test(navigator?.userAgent || '')) ||
+    Boolean(window.Capacitor?.isNativePlatform?.())
+  );
+};
+
+const resolveBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (isNativePlatform()) {
+    // If inside mobile APK and envUrl is missing or points to localhost, route to PythonAnywhere production
+    if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+      return 'https://Ganeshpatil007.pythonanywhere.com/api';
+    }
+  }
+  return envUrl || 'http://localhost:8000/api';
+};
+
+const BASE_URL = resolveBaseUrl();
 const api = axios.create({ baseURL: BASE_URL, headers: { 'Content-Type': 'application/json' } });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');

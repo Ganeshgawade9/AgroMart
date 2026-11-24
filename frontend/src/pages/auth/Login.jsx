@@ -58,7 +58,7 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-green-100 flex items-center justify-center p-4">
+    <div className="flex-1 min-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary-50 to-green-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
         <div className="flex items-center gap-2 justify-center mb-6">
           <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
@@ -111,30 +111,7 @@ export default function Login() {
           </button>
         </form>
 
-        {/* Quick login helper for testing */}
-        <div className="mt-4 p-3 bg-gray-50 rounded-xl border border-gray-200">
-          <p className="text-xs font-semibold text-gray-600 mb-2">{t('login.quick_title')}</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {[
-              { label: t('login.role_farmer'), email: 'farmer@agroconnect.in', pass: 'farmer123' },
-              { label: t('login.role_seller'), email: 'ganesh@agroconnect.in', pass: 'seller123' },
-              { label: t('login.role_delivery'), email: 'delivery@agroconnect.in', pass: 'delivery123' },
-              { label: t('login.role_admin'), email: 'admin@agroconnect.in', pass: 'admin123' },
-            ].map(u => (
-              <button
-                key={u.email}
-                type="button"
-                onClick={() => setForm({ email: u.email, password: u.pass })}
-                className="text-xs bg-white border border-gray-200 rounded-lg px-2 py-1.5 hover:bg-primary-50 hover:border-primary-300 text-gray-700 transition-colors"
-              >
-                {u.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-gray-400 mt-1.5">{t('login.quick_hint')}</p>
-        </div>
-
-        <p className="text-center text-sm text-gray-600 mt-4">
+        <p className="text-center text-sm text-gray-600 mt-6">
           {t('login.no_account')}{' '}
           <Link to="/register" className="text-primary-600 font-semibold hover:underline">
             {t('login.register')}

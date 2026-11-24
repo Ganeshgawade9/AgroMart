@@ -48,7 +48,7 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-green-100 flex items-center justify-center p-4 py-8">
+    <div className="flex-1 min-h-[calc(100vh-4rem)] bg-gradient-to-br from-primary-50 to-green-100 flex items-center justify-center p-4 py-8">
       <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-lg">
         <div className="flex items-center gap-2 justify-center mb-6">
           <div className="w-10 h-10 bg-primary-600 rounded-xl flex items-center justify-center">
