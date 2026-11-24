@@ -84,11 +84,11 @@ class Command(BaseCommand):
         # 4. Sellers (3 demo sellers around Nashik area)
         seller_data = [
             ('Ganesh Agro Center', 'ganesh@agroconnect.in', 'seller123', 'Ganesh Patil', '9876543210',
-             20.0063, 73.7894, 'Sinnar', 'Sinnar', 'Nashik'),
+             18.590611, 73.746218, 'Hinjewadi', 'Mulshi', 'Pune'),
             ('Mahadev Fertilizers', 'mahadev@agroconnect.in', 'seller123', 'Mahadev Shinde', '9876543211',
-             20.0154, 73.8012, 'Ozar', 'Niphad', 'Nashik'),
+             18.3500, 73.8500, 'Khed Shivapur', 'Haveli', 'Pune'),
             ('Krishna Agro Supplies', 'krishna@agroconnect.in', 'seller123', 'Krishna Jadhav', '9876543212',
-             20.1234, 73.7456, 'Ghoti', 'Igatpuri', 'Nashik'),
+             18.7800, 73.8800, 'Chakan', 'Khed', 'Pune'),
         ]
         sellers = []
         for shop_name, email, pwd, full_name, phone, lat, lng, village, taluka, district in seller_data:

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -46,7 +46,7 @@ export default function SellerOrderDetail() {
   /* ================================
      FETCH ORDER
   ================================= */
-  const fetchOrder = () => {
+  const fetchOrder = useCallback(() => {
     setLoading(true);
 
     getOrder(id)
@@ -60,11 +60,11 @@ export default function SellerOrderDetail() {
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, [id]);
 
   useEffect(() => {
     fetchOrder();
-  }, [id]);
+  }, [fetchOrder]);
 
   /* ================================
      UPDATE ORDER STATUS

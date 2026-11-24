@@ -7,7 +7,7 @@ const CATEGORY_TYPES = ['fertilizer', 'pesticide', 'herbicide', 'fungicide', 'or
 const RATINGS = [4, 3, 2, 1];
 const DISCOUNTS = [10, 20, 30, 50];
 const NEW_ARRIVAL_DAYS = [7, 30, 90];
-const DISTANCES = [1, 5, 10, 20, 50, 100];
+const DISTANCES = [5, 15, 20, 25, 50, 100];
 const VISIBLE_OPTIONS = 6;
 
 function Section({ title, children, defaultOpen = false, forceOpen = false }) {

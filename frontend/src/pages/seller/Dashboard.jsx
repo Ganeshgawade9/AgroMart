@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Package, IndianRupee, ShoppingBag, AlertTriangle, Users, Box, CheckCircle, XCircle, ArrowRight, Activity, CreditCard, Download, Settings } from 'lucide-react';
+import { Package, IndianRupee, ShoppingBag, AlertTriangle, Users, Box, CheckCircle, Activity, CreditCard, Download, Settings } from 'lucide-react';
 import { getSellerDashboardStats, getSellerOrders, getPaymentAnalytics } from '../../api/orders';
 import { formatPrice, formatDate, getStatusColor, getStatusLabel } from '../../utils/helpers';
 import useAuthStore from '../../store/authStore';

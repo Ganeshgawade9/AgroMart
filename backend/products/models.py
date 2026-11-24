@@ -40,6 +40,7 @@ class Category(models.Model):
 
 class Brand(models.Model):
     name = models.CharField(max_length=100)
+    category_group = models.CharField(max_length=120, blank=True, default='')  # e.g. 'seeds,crop_protection,popular'
     logo = models.ImageField(upload_to='brands/', blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
@@ -87,6 +88,30 @@ class Product(models.Model):
 
     def __str__(self):
         return self.name
+
+    def save(self, *args, **kwargs):
+        is_restocked = False
+        if self.pk:
+            old_stock = Product.objects.filter(pk=self.pk).values_list('stock', flat=True).first()
+            if old_stock is not None and old_stock <= 0 and self.stock > 0:
+                is_restocked = True
+        super().save(*args, **kwargs)
+
+        if is_restocked:
+            self._notify_subscribers()
+
+    def _notify_subscribers(self):
+        from notifications.utils import send_notification
+        from django.utils import timezone
+        alerts = self.restock_subscribers.filter(is_notified=False)
+        for alert in alerts:
+            send_notification(
+                user=alert.user,
+                notification_type='back_in_stock',
+                message=f'Good news! "{self.name}" is now back in stock at {self.seller_shop_name}. Hurry and order now!',
+                order_id=self.id
+            )
+        alerts.update(is_notified=True, notified_at=timezone.now())
 
     @property
     def is_in_stock(self):
@@ -146,3 +171,84 @@ class Cart(models.Model):
     @property
     def subtotal(self):
         return self.product.price * self.quantity
+
+
+class Banner(models.Model):
+    title = models.CharField(max_length=200, blank=True)
+    subtitle = models.CharField(max_length=255, blank=True)
+    image = models.ImageField(upload_to='banners/')
+    link_url = models.CharField(max_length=500, blank=True, default='', help_text="Target URL or frontend route (e.g. /products?category_type=fertilizer)")
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=0, help_text="Display order, lowest first")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', '-created_at']
+
+    def __str__(self):
+        return self.title or f"Banner #{self.id}"
+
+
+class ProductNotification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_notifications')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='restock_subscribers')
+    is_notified = models.BooleanField(default=False)
+    notified_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ['user', 'product']
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.full_name} -> {self.product.name} (Notified: {self.is_notified})"
+
+
+class HomeCategory(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True, help_text="Unique identifier e.g. offers, sprayers, vegetable_seeds")
+    title_key = models.CharField(max_length=100, blank=True, default='', help_text="i18n translation key e.g. cat.offers")
+    image = models.ImageField(upload_to='categories/', blank=True, null=True, help_text="Upload custom category image from admin")
+    default_image = models.CharField(max_length=255, blank=True, default='', help_text="Fallback static image path (e.g. /categories/offers.svg)")
+    bg_color = models.CharField(max_length=30, blank=True, default='#f3f4f6', help_text="Hex code for tile background (e.g. #d1fae5)")
+    link_url = models.CharField(max_length=255, blank=True, default='/products', help_text="Frontend route or link (e.g. /products?category_type=seeds)")
+    order = models.PositiveIntegerField(default=0, help_text="Display order on home page, lowest first")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Home Category'
+        verbose_name_plural = 'Home Categories'
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def image_url(self):
+        if self.image:
+            return self.image.url
+        return self.default_image
+
+
+class Crop(models.Model):
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(unique=True)
+    search_query = models.CharField(max_length=100, blank=True, help_text="Product search term e.g. Tomato, Chilli")
+    image = models.ImageField(upload_to='crops/', blank=True, null=True, help_text="Upload custom crop image from admin")
+    default_image = models.CharField(max_length=255, blank=True, default='', help_text="Fallback static image path (e.g. /crops/tomato.png)")
+    order = models.PositiveIntegerField(default=0, help_text="Display order, lowest first")
+    is_featured = models.BooleanField(default=False, help_text="Show in Home Page horizontal row")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def image_url(self):
+        if self.image:
+            return self.image.url
+        return self.default_image

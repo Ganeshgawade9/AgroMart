@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-agroconnect-change-in-production-xyz123')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='*,Ganeshpatil007.pythonanywhere.com,localhost,127.0.0.1').split(',') if h.strip()]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -97,6 +97,7 @@ CORS_ALLOWED_ORIGINS = [
     ).split(',')
     if origin.strip()
 ]
+CORS_ALLOW_ALL_ORIGINS = config('CORS_ALLOW_ALL_ORIGINS', default=False, cast=bool)
 CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
@@ -108,6 +109,10 @@ CSRF_TRUSTED_ORIGINS = [
     if origin.strip()
 ]
 
+# Path to built React frontend (if built locally or in PythonAnywhere)
+FRONTEND_DIST_DIR = BASE_DIR.parent / 'frontend' / 'dist'
+if (FRONTEND_DIST_DIR / 'assets').exists():
+    STATICFILES_DIRS = [FRONTEND_DIST_DIR / 'assets']
 CLOUDINARY_CLOUD_NAME = config('CLOUDINARY_CLOUD_NAME', default='')
 CLOUDINARY_STORAGE = {
     'CLOUD_NAME': CLOUDINARY_CLOUD_NAME,
@@ -128,13 +133,16 @@ COHERE_API_KEY = config('COHERE_API_KEY', default='')
 
 
 # --- SMS / OTP -------------------------------------------------------------
-# 'console' only logs the message (development). Use 'fast2sms' or 'twilio'
-# in production and fill in the matching keys in .env.
+# 'console' only logs the message (development). Use 'firebase' or 'twilio'
+# in production.
 SMS_BACKEND = config('SMS_BACKEND', default='console')
-FAST2SMS_API_KEY = config('FAST2SMS_API_KEY', default='')
+FIREBASE_CREDENTIALS_PATH = config('FIREBASE_CREDENTIALS_PATH', default='')
 TWILIO_ACCOUNT_SID = config('TWILIO_ACCOUNT_SID', default='')
 TWILIO_AUTH_TOKEN = config('TWILIO_AUTH_TOKEN', default='')
 TWILIO_FROM_NUMBER = config('TWILIO_FROM_NUMBER', default='')
 OTP_EXPIRY_MINUTES = config('OTP_EXPIRY_MINUTES', default=10, cast=int)
 OTP_MAX_ATTEMPTS = config('OTP_MAX_ATTEMPTS', default=5, cast=int)
 OTP_RESEND_SECONDS = config('OTP_RESEND_SECONDS', default=60, cast=int)
+REQUIRE_REGISTRATION_OTP = config('REQUIRE_REGISTRATION_OTP', default=True, cast=bool)
+
+

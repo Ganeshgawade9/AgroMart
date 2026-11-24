@@ -13,7 +13,7 @@ export const downloadInvoice = (id) => api.get(`/orders/${id}/invoice/`, { respo
 // Payment endpoints
 export const initiatePayment = (data) => api.post('/orders/payments/initiate/', data);
 export const getPaymentStatus = (paymentId) => api.get(`/orders/payments/${paymentId}/status/`);
-export const verifyPayment = (paymentId) => api.post(`/orders/payments/${paymentId}/verify/`);
+export const verifyPayment = (paymentId, data = {}) => api.post(`/orders/payments/${paymentId}/verify/`, data);
 export const getPaymentAnalytics = () => api.get('/orders/payments/seller-analytics/');
 export const getSellerPaymentSettings = () => api.get('/orders/seller-payment-settings/');
 export const updateSellerPaymentSettings = (data) => api.patch('/orders/seller-payment-settings/', data);

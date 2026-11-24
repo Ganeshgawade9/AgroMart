@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 import random
+from django.db import transaction
 from .models import Order, OrderItem, Invoice
 from .serializers import OrderCreateSerializer, OrderListSerializer, OrderDetailSerializer, DeliveryOrderSerializer
 from . import dispatch
@@ -42,6 +43,7 @@ def generate_order_invoice(order):
 class PlaceOrderView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request):
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -190,6 +192,8 @@ class UpdateOrderStatusView(APIView):
                     pass
 
             order.save()
+            if new_status == Order.DELIVERED:
+                generate_order_invoice(order)
             send_notification(order.farmer, 'order_update', f'Your order #{order.order_number} is now {order.get_status_display()}', order.id)
 
             # Delivery dispatch: find a rider while the shop prepares the order
@@ -265,6 +269,7 @@ class DeliveryUpdateStatusView(APIView):
         order.delivered_at = timezone.now()
         order.payment_status = 'paid'
         order.save()
+        generate_order_invoice(order)
         from notifications.utils import send_notification
         send_notification(order.farmer, 'order_update', f'Your order #{order.order_number} has been delivered!', order.id)
         send_notification(order.seller, 'order_update', f'Order #{order.order_number} delivered successfully.', order.id)

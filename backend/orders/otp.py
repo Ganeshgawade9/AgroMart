@@ -1,9 +1,15 @@
 """OTP checks for the two order handovers.
 
-  pickup   seller -> delivery partner. The code is SMSed to the seller's mobile;
-           the rider must enter it to confirm they collected the order.
-  delivery delivery partner -> farmer. The code is SMSed to the farmer's mobile;
-           the rider must enter it to confirm the farmer received the order.
+  pickup   seller -> delivery partner. The code is SMSed to the mobile number the
+           seller registered with; the rider must enter it to confirm they
+           collected the order.
+  delivery delivery partner -> farmer. The code is SMSed to the mobile number the
+           farmer registered with; the rider must enter it to confirm the
+           farmer received the order.
+
+OTPs only ever go to the registered number of the account that owns the code.
+The contact number typed at checkout (order.delivery_phone) is for the rider to
+call and is never used for OTPs.
 
 A code allows OTP_MAX_ATTEMPTS wrong guesses, after which it is locked until
 the owner requests a fresh one.
@@ -33,10 +39,9 @@ def _fields(kind):
 
 
 def _recipient_phone(order, kind):
-    if kind == PICKUP:
-        return order.seller.phone
-    # Farmer's registered mobile, falling back to the contact number given at checkout
-    return order.farmer.phone if normalize_phone(order.farmer.phone) else order.delivery_phone
+    """The registered mobile number of the person who must receive this code."""
+    owner = order.seller if kind == PICKUP else order.farmer
+    return owner.phone
 
 
 def _message(order, kind, code):

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Trash2,
@@ -48,7 +48,7 @@ export default function Cart() {
   /* ================================
      FETCH CART
   ================================= */
-  const fetchCart = async () => {
+  const fetchCart = useCallback(async () => {
     try {
       const response = await getCart();
 
@@ -67,11 +67,11 @@ export default function Cart() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [setGlobalCart]);
 
   useEffect(() => {
     fetchCart();
-  }, []);
+  }, [fetchCart]);
 
   /* ================================
      CHANGE QUANTITY

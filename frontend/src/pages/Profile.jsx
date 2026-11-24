@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { User, MapPin, Save, Navigation } from 'lucide-react';
+
 import { getProfile, updateProfile, updateLocation } from '../api/auth';
 import useAuthStore from '../store/authStore';
-import useLocation from '../hooks/useLocation';
+import useLocationStore from '../store/locationStore';
+import { reverseGeocodeDetails } from '../utils/geocode';
 import Spinner from '../components/common/Spinner';
 import toast from 'react-hot-toast';
 
@@ -11,17 +13,76 @@ export default function Profile() {
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const { location, loading: locLoading, getLocation } = useLocation();
+  const [detecting, setDetecting] = useState(false);
 
   useEffect(() => {
     getProfile().then(r => setForm(r.data)).catch(() => { }).finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (location) {
-      updateLocation(location.lat, location.lng).then(() => toast.success('Location updated!')).catch(() => { });
+  const handleAutoDetect = () => {
+    if (!navigator.geolocation) {
+      toast.error('Geolocation is not supported by your browser');
+      return;
     }
-  }, [location]);
+    setDetecting(true);
+    const toastId = toast.loading('Detecting your GPS location...');
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+
+          toast.loading('Fetching address details...', { id: toastId });
+          const details = await reverseGeocodeDetails(lat, lng);
+
+          setForm((prev) => {
+            const updated = {
+              ...prev,
+              latitude: lat,
+              longitude: lng,
+            };
+            if (details) {
+              if (details.village) updated.village = details.village;
+              if (details.taluka) updated.taluka = details.taluka;
+              if (details.district) updated.district = details.district;
+              if (details.pincode) updated.pincode = details.pincode;
+              if (details.state) updated.state = details.state;
+              if (details.address) updated.address = details.address;
+            }
+            return updated;
+          });
+
+          // Sync coordinates with backend
+          updateLocation(lat, lng).catch(() => {});
+
+          // Sync with global location store so navbar and nearby shops update too
+          const label = [details?.village || details?.taluka, details?.district].filter(Boolean).join(', ') || 'Current location';
+          if (useLocationStore.getState().setManual) {
+            useLocationStore.getState().setManual({ lat, lng, label });
+          }
+
+          const summary = [details?.village, details?.taluka, details?.district].filter(Boolean).join(', ');
+          toast.success(`Location auto-detected${summary ? `: ${summary}` : '!' }`, { id: toastId });
+        } catch (err) {
+          console.error('Auto-detect error:', err);
+          toast.error('Location detected, but address details could not be loaded.', { id: toastId });
+        } finally {
+          setDetecting(false);
+        }
+      },
+      (err) => {
+        let msg = 'Could not get your location.';
+        if (err.code === 1) msg = 'Location permission was denied. Please allow location in your browser.';
+        else if (err.code === 2) msg = 'Location unavailable. Please try again.';
+        else if (err.code === 3) msg = 'Location request timed out. Please try again.';
+        toast.error(msg, { id: toastId });
+        setDetecting(false);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  };
+
 
   const handleSave = async (e) => {
     e.preventDefault();
@@ -30,7 +91,11 @@ export default function Profile() {
       const res = await updateProfile(form);
       updateUser(res.data);
       toast.success('Profile updated!');
-    } catch { toast.error('Failed to update'); } finally { setSaving(false); }
+    } catch (err) {
+      const errors = err.response?.data;
+      const message = errors && typeof errors === 'object' ? Object.values(errors).flat().join(', ') : '';
+      toast.error(message || 'Failed to update');
+    } finally { setSaving(false); }
   };
 
   if (loading || !form) return <div className="flex justify-center py-20"><Spinner /></div>;
@@ -61,8 +126,9 @@ export default function Profile() {
               <input className="input" value={form.full_name || ''} onChange={e => set('full_name', e.target.value)} />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700 block mb-1">Phone</label>
-              <input className="input" value={form.phone || ''} onChange={e => set('phone', e.target.value)} />
+              <label className="text-sm font-medium text-gray-700 block mb-1">Mobile number</label>
+              <input className="input" type="tel" inputMode="numeric" placeholder="9876543210" value={form.phone || ''} onChange={e => set('phone', e.target.value)} />
+              <p className="text-xs text-gray-500 mt-1">OTPs are sent to this number.</p>
             </div>
           </div>
           <div>
@@ -74,10 +140,16 @@ export default function Profile() {
         <div className="card space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="font-bold text-gray-900 flex items-center gap-2"><MapPin className="w-4 h-4 text-primary-600" /> Location</h2>
-            <button type="button" onClick={getLocation} disabled={locLoading}
-              className="text-sm text-primary-600 flex items-center gap-1 hover:underline">
-              <Navigation className="w-3 h-3" /> {locLoading ? 'Getting...' : 'Auto-detect'}
+            <button
+              type="button"
+              onClick={handleAutoDetect}
+              disabled={detecting}
+              className="text-sm font-semibold text-primary-600 hover:text-primary-700 flex items-center gap-1.5 hover:underline disabled:opacity-50 transition-colors"
+            >
+              <Navigation className={`w-3.5 h-3.5 ${detecting ? 'animate-spin text-primary-700' : ''}`} />
+              {detecting ? 'Auto-detecting...' : 'Auto-detect'}
             </button>
+
           </div>
           <div>
             <label className="text-sm font-medium text-gray-700 block mb-1">Address</label>

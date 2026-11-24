@@ -1,11 +1,12 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from .models import Brand, Category, Product
+from .models import Brand, Category, Product, Banner
 
 User = get_user_model()
 URL = '/api/products/'
@@ -172,3 +173,211 @@ class SoldOutListingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         results = response.data['results'] if isinstance(response.data, dict) else response.data
         self.assertEqual([p['name'] for p in results], ['Featured', 'Gone'])
+
+
+class BannerAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.admin = User.objects.create_user(
+            email='admin@example.com', password='adminpass', full_name='Admin User', role='admin', is_staff=True
+        )
+        self.farmer = User.objects.create_user(
+            email='farmer@example.com', password='farmerpass', full_name='Farmer User', role='farmer'
+        )
+        self.banner1 = Banner.objects.create(
+            title='Banner 1',
+            subtitle='Offer 1',
+            image='banners/b1.png',
+            link_url='/products?category_type=fertilizer',
+            order=1,
+            is_active=True
+        )
+        self.banner2 = Banner.objects.create(
+            title='Banner 2 Inactive',
+            subtitle='Offer 2',
+            image='banners/b2.png',
+            link_url='/products',
+            order=2,
+            is_active=False
+        )
+
+    def test_public_banners_returns_only_active_ordered(self):
+        res = self.client.get('/api/products/banners/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data), 1)
+        self.assertEqual(res.data[0]['id'], self.banner1.id)
+        self.assertEqual(res.data[0]['title'], 'Banner 1')
+
+    def test_non_admin_cannot_access_admin_banners(self):
+        self.client.force_authenticate(user=self.farmer)
+        res = self.client.get('/api/products/admin/banners/')
+        self.assertEqual(res.status_code, 403)
+
+    def test_admin_can_list_all_banners(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.get('/api/products/admin/banners/')
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(len(res.data), 2)
+
+    def test_admin_can_upload_multiple_banners(self):
+        self.client.force_authenticate(user=self.admin)
+        img1 = SimpleUploadedFile('b1.jpg', b'image_bits_1', content_type='image/jpeg')
+        img2 = SimpleUploadedFile('b2.jpg', b'image_bits_2', content_type='image/jpeg')
+        res = self.client.post('/api/products/admin/banners/', {
+            'images': [img1, img2],
+            'title': 'Diwali Sale',
+            'link_url': '/products?offers=true'
+        }, format='multipart')
+        self.assertEqual(res.status_code, 201)
+        self.assertEqual(len(res.data), 2)
+        self.assertEqual(Banner.objects.count(), 4)
+
+    def test_admin_can_patch_and_delete_banner(self):
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.patch(f'/api/products/admin/banners/{self.banner2.id}/', {
+            'is_active': True,
+            'title': 'Activated Banner'
+        }, format='json')
+        self.assertEqual(res.status_code, 200)
+        self.banner2.refresh_from_db()
+        self.assertTrue(self.banner2.is_active)
+        self.assertEqual(self.banner2.title, 'Activated Banner')
+
+        del_res = self.client.delete(f'/api/products/admin/banners/{self.banner2.id}/')
+        self.assertEqual(del_res.status_code, 200)
+        self.assertFalse(Banner.objects.filter(id=self.banner2.id).exists())
+
+
+class ProductRestockNotifyTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.seller = User.objects.create_user(
+            email='seller_restock@test.com', password='password123', full_name='Krishi Kendra', role='seller'
+        )
+        self.farmer = User.objects.create_user(
+            email='farmer_restock@test.com', password='password123', full_name='Ramesh Farmer', role='farmer'
+        )
+        self.category = Category.objects.create(name='Seeds', slug='seeds-restock', category_type='seeds')
+        self.product = Product.objects.create(
+            seller=self.seller,
+            category=self.category,
+            name='Hybrid Onion Seeds 1kg',
+            description='Top quality',
+            price=250,
+            mrp=300,
+            stock=0, # Initially OUT OF STOCK
+            unit='kg'
+        )
+
+    def test_notify_me_toggle_subscription(self):
+        self.client.force_authenticate(user=self.farmer)
+
+        # Initially not subscribed
+        get_res = self.client.get(f'/api/products/{self.product.id}/notify-me/')
+        self.assertEqual(get_res.status_code, 200)
+        self.assertFalse(get_res.data['subscribed'])
+
+        # Subscribe via POST
+        post_res = self.client.post(f'/api/products/{self.product.id}/notify-me/')
+        self.assertEqual(post_res.status_code, 200)
+        self.assertTrue(post_res.data['subscribed'])
+
+        # Check detail serializer includes is_notify_subscribed = True
+        detail_res = self.client.get(f'/api/products/{self.product.id}/')
+        self.assertEqual(detail_res.status_code, 200)
+        self.assertFalse(detail_res.data['is_in_stock'])
+        self.assertTrue(detail_res.data['is_notify_subscribed'])
+
+        # Toggle unsubscribe by clicking again
+        unsub_res = self.client.post(f'/api/products/{self.product.id}/notify-me/')
+        self.assertEqual(unsub_res.status_code, 200)
+        self.assertFalse(unsub_res.data['subscribed'])
+
+        detail_res2 = self.client.get(f'/api/products/{self.product.id}/')
+        self.assertFalse(detail_res2.data['is_notify_subscribed'])
+
+    def test_restock_triggers_automatic_notification_to_subscribers(self):
+        from notifications.models import Notification
+        from products.models import ProductNotification
+
+        self.client.force_authenticate(user=self.farmer)
+        # Farmer clicks "Notify Me"
+        self.client.post(f'/api/products/{self.product.id}/notify-me/')
+        self.assertEqual(ProductNotification.objects.filter(user=self.farmer, product=self.product, is_notified=False).count(), 1)
+
+        # Seller restocks the product from 0 to 20
+        self.product.stock = 20
+        self.product.save()
+
+        # Check that back_in_stock notification was dispatched
+        notif = Notification.objects.filter(user=self.farmer, notification_type='back_in_stock').first()
+        self.assertIsNotNone(notif)
+        self.assertIn('Hybrid Onion Seeds 1kg', notif.message)
+        self.assertEqual(notif.order_id, self.product.id)
+
+        # ProductNotification alert should now be marked is_notified=True
+        alert = ProductNotification.objects.get(user=self.farmer, product=self.product)
+        self.assertTrue(alert.is_notified)
+        self.assertIsNotNone(alert.notified_at)
+
+        # Subsequent product updates (e.g. price change or stock 20 -> 18) should NOT send duplicate restock notifications
+        initial_notif_count = Notification.objects.filter(user=self.farmer, notification_type='back_in_stock').count()
+        self.product.price = 240
+        self.product.stock = 18
+        self.product.save()
+        self.assertEqual(Notification.objects.filter(user=self.farmer, notification_type='back_in_stock').count(), initial_notif_count)
+
+
+class ProductWishlistTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.seller = User.objects.create_user(
+            email='seller_wish@test.com', password='password123', full_name='Shop Wish', role='seller'
+        )
+        self.farmer = User.objects.create_user(
+            email='farmer_wish@test.com', password='password123', full_name='Farmer Wish', role='farmer'
+        )
+        self.category = Category.objects.create(name='Fertilizer', slug='fert-wish', category_type='fertilizer')
+        self.dap = Product.objects.create(
+            seller=self.seller,
+            category=self.category,
+            name='DAP Fertilizer 50kg',
+            description='Phosphorus rich fertilizer',
+            price=1350,
+            mrp=1450,
+            stock=100,
+            unit='bag'
+        )
+
+    def test_toggle_wishlist_add_and_remove(self):
+        self.client.force_authenticate(user=self.farmer)
+
+        # Initially product is not wishlisted
+        list_res = self.client.get('/api/products/')
+        dap_data = next(p for p in list_res.data['results'] if p['id'] == self.dap.id)
+        self.assertFalse(dap_data['is_wishlisted'])
+        self.assertEqual(dap_data['description'], 'Phosphorus rich fertilizer')
+
+        # Toggle add to wishlist
+        toggle_res1 = self.client.post('/api/products/wishlist/toggle/', {'product_id': self.dap.id}, format='json')
+        self.assertEqual(toggle_res1.status_code, 200)
+        self.assertTrue(toggle_res1.data['in_wishlist'])
+
+        # Now product is wishlisted in both list and detail
+        list_res2 = self.client.get('/api/products/')
+        dap_data2 = next(p for p in list_res2.data['results'] if p['id'] == self.dap.id)
+        self.assertTrue(dap_data2['is_wishlisted'])
+
+        detail_res = self.client.get(f'/api/products/{self.dap.id}/')
+        self.assertTrue(detail_res.data['is_wishlisted'])
+
+        # Toggle remove from wishlist
+        toggle_res2 = self.client.post('/api/products/wishlist/toggle/', {'product_id': self.dap.id}, format='json')
+        self.assertEqual(toggle_res2.status_code, 200)
+        self.assertFalse(toggle_res2.data['in_wishlist'])
+
+        # Wishlist should now be empty
+        wish_list = self.client.get('/api/products/wishlist/')
+        items = wish_list.data.get('results', wish_list.data)
+        self.assertEqual(len(items), 0)
+

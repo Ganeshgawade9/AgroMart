@@ -9,6 +9,7 @@ import AIChatbot from './components/common/AIChatbot';
 import Home from './pages/Home';
 import Products from './pages/Products';
 import ProductDetail from './pages/ProductDetail';
+import Crops from './pages/Crops';
 import NearbyShops from './pages/NearbyShops';
 import Notifications from './pages/Notifications';
 import Profile from './pages/Profile';
@@ -66,6 +67,7 @@ export default function App() {
             <Route path="/" element={<Home />} />
             <Route path="/products" element={<Products />} />
             <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/crops" element={<Crops />} />
             <Route path="/nearby-shops" element={<NearbyShops />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

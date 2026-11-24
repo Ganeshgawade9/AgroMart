@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { getOrder, downloadInvoice } from '../../api/orders';
 import { formatPrice, formatDate } from '../../utils/helpers';
 import Spinner from '../../components/common/Spinner';
-import { CheckCircle2, ShoppingBag, Download, ArrowRight, MapPin, Truck } from 'lucide-react';
+import { CheckCircle2, ShoppingBag, Download, ArrowRight, Truck } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function OrderSuccess() {

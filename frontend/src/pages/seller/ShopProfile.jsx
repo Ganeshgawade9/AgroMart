@@ -1,13 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Store, MapPin, Save, Pencil } from 'lucide-react';
 import { getProfile, updateSellerProfile, updateLocation } from '../../api/auth';
-import useAuthStore from '../../store/authStore';
 import LocationPicker from '../../components/maps/LocationPicker';
 import Spinner from '../../components/common/Spinner';
 import toast from 'react-hot-toast';
 
 export default function ShopProfile() {
-    const { user, updateUser } = useAuthStore();
     const [sellerForm, setSellerForm] = useState(null);
     const [logoFile, setLogoFile] = useState(null);
     const [logoPreview, setLogoPreview] = useState(null);
@@ -16,7 +14,6 @@ export default function ShopProfile() {
     const [pickerOpen, setPickerOpen] = useState(false);
     const [shopLat, setShopLat] = useState(null);
     const [shopLng, setShopLng] = useState(null);
-    const [savingLocation, setSavingLocation] = useState(false);
 
     useEffect(() => {
         getProfile().then(r => {
@@ -63,7 +60,6 @@ export default function ShopProfile() {
     };
 
     const handleLocationSave = async ({ lat, lng }) => {
-        setSavingLocation(true);
         try {
             await updateLocation(lat, lng);
             setShopLat(lat);
@@ -72,8 +68,6 @@ export default function ShopProfile() {
             setPickerOpen(false);
         } catch {
             toast.error('Failed to save location');
-        } finally {
-            setSavingLocation(false);
         }
     };
 

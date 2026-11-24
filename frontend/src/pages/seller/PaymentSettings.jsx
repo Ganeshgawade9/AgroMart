@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getSellerPaymentSettings, updateSellerPaymentSettings } from '../../api/orders';
 import Spinner from '../../components/common/Spinner';
-import { CreditCard, Save, CheckCircle, Info, Landmark, HelpCircle } from 'lucide-react';
+import { CreditCard, Save, Info, Landmark } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function PaymentSettings() {

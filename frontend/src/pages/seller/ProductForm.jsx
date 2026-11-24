@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Upload, X, ImagePlus } from 'lucide-react';
-import { createProduct, updateProduct, getMyProducts, getCategories, getBrands } from '../../api/products';
+import { X, ImagePlus } from 'lucide-react';
+import { createProduct, updateProduct, getMyProduct, getProduct, getCategories, getBrands } from '../../api/products';
 import Spinner from '../../components/common/Spinner';
 import toast from 'react-hot-toast';
 
@@ -78,17 +78,55 @@ export default function ProductForm() {
     getCategories().then(r => setCategories(r.data.results || r.data)).catch(() => {});
     getBrands().then(r => setBrands(r.data.results || r.data)).catch(() => {});
     if (isEdit) {
-      getMyProducts().then(r => {
-        const prod = (r.data.results || r.data).find(p => p.id == id);
-        if (prod) {
-          const { image, image2, image3, ...rest } = prod;
-          setForm(f => ({ ...f, ...rest }));
-          setPreviews({ image: image || null, image2: image2 || null, image3: image3 || null });
+      const loadProduct = async () => {
+        try {
+          let prod = null;
+          try {
+            const res = await getMyProduct(id);
+            prod = res.data;
+          } catch {
+            const res = await getProduct(id);
+            prod = res.data;
+          }
+
+          if (prod) {
+            const catId = typeof prod.category === 'object' && prod.category ? prod.category.id : prod.category;
+            const brandId = typeof prod.brand === 'object' && prod.brand ? prod.brand.id : prod.brand;
+
+            setForm({
+              name: prod.name || '',
+              description: prod.description || '',
+              price: prod.price != null ? prod.price : '',
+              mrp: prod.mrp != null ? prod.mrp : '',
+              stock: prod.stock != null ? prod.stock : '',
+              unit: prod.unit || 'kg',
+              weight: prod.weight || '',
+              category: catId || '',
+              brand: brandId || '',
+              ingredients: prod.ingredients || '',
+              usage_instructions: prod.usage_instructions || '',
+              is_organic: Boolean(prod.is_organic),
+              has_free_delivery: Boolean(prod.has_free_delivery),
+              is_featured: Boolean(prod.is_featured),
+              is_active: prod.is_active !== undefined ? Boolean(prod.is_active) : true,
+            });
+
+            setPreviews({
+              image: prod.image || null,
+              image2: prod.image2 || null,
+              image3: prod.image3 || null,
+            });
+          }
+        } catch {
+          toast.error('Failed to load product details');
+        } finally {
+          setLoading(false);
         }
-        setLoading(false);
-      });
+      };
+
+      loadProduct();
     }
-  }, []);
+  }, [isEdit, id]);
 
   const setField = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
