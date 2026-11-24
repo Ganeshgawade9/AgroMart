@@ -1,7 +1,9 @@
 from rest_framework import serializers
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from notifications.sms import normalize_phone
 from .models import SellerProfile, FarmerProfile
+from . import otp as password_otp
 
 User = get_user_model()
 
@@ -21,6 +23,8 @@ class RegisterSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
     shop_name = serializers.CharField(required=False, allow_blank=True)
     phone = serializers.CharField(max_length=20, error_messages={'required': PHONE_ERROR, 'blank': PHONE_ERROR})
+    otp = serializers.CharField(required=False, write_only=True, allow_blank=True)
+    firebase_token = serializers.CharField(required=False, write_only=True, allow_blank=True)
 
     def validate_phone(self, value):
         return clean_mobile(value)
@@ -28,19 +32,43 @@ class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ['email', 'password', 'password2', 'full_name', 'phone', 'role',
-                  'village', 'taluka', 'district', 'pincode', 'address', 'shop_name']
+                  'village', 'taluka', 'district', 'pincode', 'address', 'shop_name', 'otp', 'firebase_token']
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:
             raise serializers.ValidationError({'password': 'Passwords do not match'})
         if attrs.get('role') == User.SELLER and not attrs.get('shop_name'):
             raise serializers.ValidationError({'shop_name': 'Shop name is required for sellers'})
+
+        phone = attrs.get('phone')
+        pattern = r'^\D*(?:(?:91|0)\D*)?' + r'\D*'.join(phone) + r'\D*$'
+        if User.objects.filter(phone__regex=pattern, is_active=True).exists():
+            raise serializers.ValidationError({'phone': 'An account with this mobile number already exists.'})
+
+        if getattr(settings, 'REQUIRE_REGISTRATION_OTP', True):
+            firebase_token = attrs.get('firebase_token', '').strip()
+            submitted_otp = attrs.get('otp', '').strip()
+            if firebase_token:
+                from .firebase import verify_firebase_id_token
+                ok, _ = verify_firebase_id_token(firebase_token, expected_phone=phone)
+                if not ok:
+                    raise serializers.ValidationError({'firebase_token': 'Firebase verification failed or expired.'})
+            elif submitted_otp:
+                if not password_otp.verify_registration_otp(phone, submitted_otp):
+                    raise serializers.ValidationError({'otp': 'Invalid or expired OTP.'})
+            elif not password_otp.is_registration_verified(phone):
+                raise serializers.ValidationError({'otp': 'Please verify your mobile number with OTP.'})
+
         return attrs
 
     def create(self, validated_data):
+        validated_data.pop('otp', None)
+        validated_data.pop('firebase_token', None)
         shop_name = validated_data.pop('shop_name', '')
         validated_data.pop('password2')
         password = validated_data.pop('password')
+        phone = validated_data.get('phone')
+
 
         # Sellers need admin approval
         if validated_data.get('role') == User.SELLER:
@@ -53,7 +81,9 @@ class RegisterSerializer(serializers.ModelSerializer):
         elif user.role == User.FARMER:
             FarmerProfile.objects.create(user=user)
 
+        password_otp.consume_registration_otp(phone)
         return user
+
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -119,11 +149,15 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
 class ResetPasswordSerializer(serializers.Serializer):
     identifier = serializers.CharField()
-    otp = serializers.RegexField(r'^\d{6}$', error_messages={'invalid': 'OTP must be 6 digits'})
+    otp = serializers.CharField(required=False, allow_blank=True)
+    firebase_token = serializers.CharField(required=False, allow_blank=True)
     new_password = serializers.CharField(min_length=6)
     new_password2 = serializers.CharField()
 
     def validate(self, attrs):
         if attrs['new_password'] != attrs['new_password2']:
             raise serializers.ValidationError({'new_password': 'Passwords do not match'})
+        if not attrs.get('otp') and not attrs.get('firebase_token'):
+            raise serializers.ValidationError({'otp': 'Either OTP or Firebase verification token is required'})
         return attrs
+

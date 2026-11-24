@@ -23,7 +23,7 @@ export default function PaymentFailed() {
         toast.error('Payment session details not found');
         navigate('/');
       });
-  }, [paymentId]);
+  }, [paymentId, navigate]);
 
   const handleRetryPayment = async () => {
     if (!payment) return;

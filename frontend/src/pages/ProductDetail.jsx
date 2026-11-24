@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import { useT } from '../i18n';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   ShoppingCart,
   Heart,
@@ -10,16 +10,19 @@ import {
   Truck,
   Shield,
   ChevronLeft,
+  ChevronRight,
   Plus,
-  Minus
+  Minus,
+  Bell
 } from 'lucide-react';
 
 import {
   getProduct,
   addToCart,
-  addToWishlist,
   addReview,
-  getCart
+  getCart,
+  toggleNotifyProduct,
+  toggleWishlist
 } from '../api/products';
 
 import {
@@ -31,6 +34,8 @@ import {
 import Spinner from '../components/common/Spinner';
 import useAuthStore from '../store/authStore';
 import useCartStore from '../store/cartStore';
+import useWishlistStore from '../store/wishlistStore';
+import { addRecentlyViewed } from '../utils/recentlyViewed';
 import toast from 'react-hot-toast';
 
 export default function ProductDetail() {
@@ -43,6 +48,17 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [qty, setQty] = useState(1);
   const [mainImg, setMainImg] = useState(0);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+  const [isNotifying, setIsNotifying] = useState(false);
+
+  const inWishlistStore = useWishlistStore((state) => state.isInWishlist(product?.id));
+  const [isWishlisted, setIsWishlisted] = useState(false);
+
+  useEffect(() => {
+    if (product) {
+      setIsWishlisted(inWishlistStore || Boolean(product.is_wishlisted));
+    }
+  }, [inWishlistStore, product]);
 
   const [reviewForm, setReviewForm] = useState({
     rating: 5,
@@ -59,6 +75,8 @@ export default function ProductDetail() {
     getProduct(id)
       .then((r) => {
         setProduct(r.data);
+        setIsSubscribed(Boolean(r.data?.is_notify_subscribed));
+        addRecentlyViewed(r.data);
       })
       .catch(() => {
         setProduct(null);
@@ -73,6 +91,7 @@ export default function ProductDetail() {
     getProduct(id)
       .then((r) => {
         setProduct(r.data);
+        setIsSubscribed(Boolean(r.data?.is_notify_subscribed));
         setQty((q) => Math.max(1, Math.min(q, r.data.stock || 1)));
       })
       .catch(() => {});
@@ -163,14 +182,49 @@ export default function ProductDetail() {
   const handleWishlist = async () => {
     if (!isAuthenticated) {
       toast.error('Please login first');
+      navigate('/login');
       return;
     }
 
     try {
-      await addToWishlist(product.id);
-      toast.success('Added to wishlist!');
+      const res = await toggleWishlist(product.id);
+      const nextState = Boolean(res.data.in_wishlist);
+      setIsWishlisted(nextState);
+      useWishlistStore.getState().toggleItem(product.id, nextState);
+      if (nextState) {
+        toast.success('Added to wishlist!');
+      } else {
+        toast.success('Removed from wishlist');
+      }
     } catch {
-      toast.error('Already in wishlist');
+      toast.error('Failed to update wishlist');
+    }
+  };
+
+  /* ================================
+     RESTOCK NOTIFICATION (NOTIFY ME)
+  ================================= */
+  const handleToggleNotify = async () => {
+    if (!isAuthenticated) {
+      toast.error('Please login to receive restock alerts');
+      navigate('/login');
+      return;
+    }
+
+    setIsNotifying(true);
+    try {
+      const res = await toggleNotifyProduct(product.id);
+      setIsSubscribed(res.data.subscribed);
+      if (res.data.subscribed) {
+        toast.success(res.data.message || `We will notify you when ${product.name} is back in stock!`);
+      } else {
+        toast.success(res.data.message || 'Restock alert removed');
+      }
+    } catch (err) {
+      const msg = err?.response?.data?.error || 'Failed to update restock notification';
+      toast.error(msg);
+    } finally {
+      setIsNotifying(false);
     }
   };
 
@@ -205,13 +259,20 @@ export default function ProductDetail() {
     <div className="max-w-6xl mx-auto px-4 py-6">
 
       {/* Back button */}
-      <Link
-        to="/products"
-        className="flex items-center gap-1 text-gray-500 hover:text-primary-600 text-sm mb-4"
+      <button
+        type="button"
+        onClick={() => {
+          if (window.history.state && window.history.state.idx > 0) {
+            navigate(-1);
+          } else {
+            navigate('/products');
+          }
+        }}
+        className="flex items-center gap-1 text-gray-500 hover:text-primary-600 text-sm mb-4 font-medium transition-colors cursor-pointer"
       >
         <ChevronLeft className="w-4 h-4" />
-        Back to products
-      </Link>
+        Back
+      </button>
 
       {/* =========================================
           PRODUCT TOP SECTION
@@ -224,48 +285,77 @@ export default function ProductDetail() {
         <div>
 
           {/* Main image */}
-          <div className="bg-gray-50 rounded-2xl overflow-hidden aspect-square mb-3 border border-gray-100">
+          <div className="relative bg-white rounded-2xl overflow-hidden aspect-square mb-3 border border-gray-100 shadow-sm flex items-center justify-center">
+            {!product.is_in_stock && (
+              <span className="absolute top-3 left-3 bg-red-600 text-white text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-md shadow-md z-10">
+                OUT OF STOCK
+              </span>
+            )}
 
             <img
               src={images[mainImg] || IMG_PLACEHOLDER}
               alt={product.name}
-              className="w-full h-full object-contain p-4"
+              className={`w-full h-full object-contain p-4 ${product.is_in_stock ? '' : 'opacity-85'}`}
               onError={(e) => {
                 e.currentTarget.onerror = null;
                 e.currentTarget.src = IMG_PLACEHOLDER;
               }}
             />
 
+            {/* Left/Right navigation arrows when product has multiple images */}
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMainImg((prev) => (prev - 1 + images.length) % images.length)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white text-gray-800 shadow-md border border-gray-200 flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-10"
+                  aria-label="Previous image"
+                >
+                  <ChevronLeft className="w-5 h-5 text-gray-700" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMainImg((prev) => (prev + 1) % images.length)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/95 hover:bg-white text-gray-800 shadow-md border border-gray-200 flex items-center justify-center transition-all hover:scale-105 active:scale-95 z-10"
+                  aria-label="Next image"
+                >
+                  <ChevronRight className="w-5 h-5 text-gray-700" />
+                </button>
+
+                {/* Image counter indicator */}
+                <span className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm text-white text-[11px] font-medium px-2.5 py-0.5 rounded-full z-10">
+                  {mainImg + 1} / {images.length}
+                </span>
+              </>
+            )}
           </div>
 
-          {/* Image thumbnails */}
+          {/* Image thumbnails (BigHaat style gallery) */}
           {images.length > 1 && (
-            <div className="flex gap-2">
-
+            <div className="flex items-center gap-2.5 overflow-x-auto pb-2 pt-1 px-0.5 scrollbar-thin">
               {images.map((img, i) => (
                 <button
                   key={i}
                   type="button"
                   onClick={() => setMainImg(i)}
-                  className={`w-16 h-16 rounded-lg border-2 overflow-hidden ${mainImg === i
-                      ? 'border-primary-500'
-                      : 'border-gray-200'
-                    }`}
+                  className={`relative flex-shrink-0 w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-white p-1 transition-all cursor-pointer ${
+                    mainImg === i
+                      ? 'border-2 border-gray-900 shadow-sm ring-1 ring-gray-900/10'
+                      : 'border border-gray-200 hover:border-gray-400 opacity-80 hover:opacity-100'
+                  }`}
+                  aria-label={`View image ${i + 1}`}
                 >
-
                   <img
                     src={img || IMG_PLACEHOLDER}
-                    alt=""
-                    className="w-full h-full object-cover"
+                    alt={`${product.name} angle ${i + 1}`}
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       e.currentTarget.onerror = null;
                       e.currentTarget.src = IMG_PLACEHOLDER;
                     }}
                   />
-
                 </button>
               ))}
-
             </div>
           )}
 
@@ -314,23 +404,31 @@ export default function ProductDetail() {
 
           </div>
 
-          {/* Price */}
-          <div className="flex items-baseline gap-3 mb-4">
+          {/* Price & Offer / OUT OF STOCK badge */}
+          <div className="flex items-center flex-wrap gap-3 mb-4">
 
             <span className="text-3xl font-bold text-gray-900">
               {formatPrice(product.price)}
             </span>
 
-            {product.mrp > product.price && (
+            {/* When in stock, show MRP and discount */}
+            {product.is_in_stock && product.mrp > product.price && (
               <>
                 <span className="text-lg text-gray-400 line-through">
                   {formatPrice(product.mrp)}
                 </span>
 
-                <span className="text-green-600 font-semibold">
+                <span className="text-green-600 font-semibold bg-green-50 px-2 py-0.5 rounded text-sm">
                   {discount}% off
                 </span>
               </>
+            )}
+
+            {/* When sold out, immediate remove offers and add OUT OF STOCK label in offers place */}
+            {!product.is_in_stock && (
+              <span className="bg-red-600 text-white font-bold text-xs uppercase tracking-wider px-2.5 py-1 rounded shadow-sm">
+                OUT OF STOCK
+              </span>
             )}
 
           </div>
@@ -465,12 +563,66 @@ export default function ProductDetail() {
               <button
                 type="button"
                 onClick={handleWishlist}
-                className="w-full flex items-center justify-center gap-2 border border-gray-200 py-2 rounded-lg text-sm text-gray-600 hover:bg-gray-50"
+                className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all border ${
+                  isWishlisted
+                    ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
               >
-                <Heart className="w-4 h-4" />
-                Save to Wishlist
+                <Heart className={`w-4 h-4 transition-transform ${isWishlisted ? 'fill-red-500 text-red-500 scale-110' : ''}`} />
+                {isWishlisted ? 'Saved in Wishlist ❤️' : 'Save to Wishlist'}
               </button>
 
+            </div>
+          )}
+
+          {/* Out of Stock & Restock Alert Section */}
+          {!product.is_in_stock && (
+            <div className="mt-6 p-4 rounded-xl border border-amber-200 bg-amber-50/70 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0 text-amber-700">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900 text-sm">
+                    Currently Out of Stock
+                  </h4>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    We will notify you automatically as soon as this product is back in stock at {product.seller_shop_name || 'the seller'}.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleToggleNotify}
+                disabled={isNotifying}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg font-semibold text-sm transition-all shadow-sm ${
+                  isSubscribed
+                    ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+                    : 'bg-primary-600 text-white hover:bg-primary-700 active:scale-[0.99]'
+                }`}
+              >
+                <Bell className={`w-4 h-4 ${isSubscribed ? 'fill-amber-700 text-amber-700' : ''}`} />
+                {isNotifying
+                  ? 'Updating...'
+                  : isSubscribed
+                  ? 'Notified ✓ (Click to cancel alert)'
+                  : 'Notify Me When Available'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleWishlist}
+                className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition-all border ${
+                  isWishlisted
+                    ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100 shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <Heart className={`w-4 h-4 transition-transform ${isWishlisted ? 'fill-red-500 text-red-500 scale-110' : ''}`} />
+                {isWishlisted ? 'Saved in Wishlist ❤️' : 'Save to Wishlist'}
+              </button>
             </div>
           )}
 

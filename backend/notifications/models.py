@@ -10,6 +10,7 @@ class Notification(models.Model):
     PAYMENT = 'payment'
     LOW_STOCK = 'low_stock'
     OFFER = 'offer'
+    BACK_IN_STOCK = 'back_in_stock'
 
     TYPE_CHOICES = [
         (NEW_ORDER, 'New Order'),
@@ -17,6 +18,7 @@ class Notification(models.Model):
         (PAYMENT, 'Payment'),
         (LOW_STOCK, 'Low Stock'),
         (OFFER, 'Offer'),
+        (BACK_IN_STOCK, 'Back in Stock'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')

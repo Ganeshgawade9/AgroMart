@@ -111,7 +111,8 @@ class InitiatePaymentView(APIView):
             if payment_method in ['razorpay', 'phonepe', 'cashfree', 'stripe']:
                 has_legacy_toggles = (payment_method == 'razorpay' and seller_profile and seller_profile.razorpay_enabled)
                 has_online_payments = (seller_profile and seller_profile.online_payments_enabled)
-                if not (has_legacy_toggles or has_online_payments):
+                # In sandbox demo mode, Razorpay is always supported
+                if payment_method != 'razorpay' and not (has_legacy_toggles or has_online_payments):
                     return Response({'error': f'Seller does not support Online Gateway payments'}, status=400)
 
             if payment_method == 'cod':
@@ -228,11 +229,21 @@ class PaymentStatusView(APIView):
         service = PaymentService()
         service.check_payment_status(payment)
 
+        seller_profile = getattr(payment.seller, 'seller_profile', None)
+        shop_name = seller_profile.shop_name if seller_profile else payment.seller.full_name
+
         response_data = {
             'payment_id': payment.payment_id,
+            'gateway_order_id': payment.gateway_order_id or f"order_{payment.payment_id[:10]}",
             'status': payment.status,
             'payment_method': payment.payment_method,
             'amount': float(payment.amount),
+            'shop_name': shop_name,
+            'metadata': payment.metadata or {},
+            'items': payment.checkout_data.get('items', []) if payment.checkout_data else [],
+            'subtotal': payment.checkout_data.get('subtotal') if payment.checkout_data else float(payment.amount),
+            'gst': payment.checkout_data.get('gst', 0) if payment.checkout_data else 0,
+            'delivery_charge': payment.checkout_data.get('delivery_charge', 0) if payment.checkout_data else 0,
             'created_at': payment.created_at.isoformat(),
         }
 

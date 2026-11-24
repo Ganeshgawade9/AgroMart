@@ -1,4 +1,4 @@
-import { CheckCircle, Circle, Clock, Package, Truck, Home } from 'lucide-react';
+import { CheckCircle, Clock, Package, Truck, Home } from 'lucide-react';
 
 const STEPS = [
   { key: 'pending', label: 'Order Placed', icon: Clock },

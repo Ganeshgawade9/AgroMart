@@ -31,57 +31,19 @@ class NormalizePhoneTests(SimpleTestCase):
             self.assertEqual(sms.normalize_phone(typed), '', repr(typed))
 
 
-@override_settings(SMS_BACKEND='fast2sms', FAST2SMS_API_KEY='key')
-class Fast2SmsTests(SimpleTestCase):
-    def send(self, response=None, error=None):
-        with mock.patch('notifications.sms.urllib.request.urlopen') as urlopen:
-            if error:
-                urlopen.side_effect = error
-            else:
-                urlopen.return_value = response
+@override_settings(SMS_BACKEND='firebase')
+class FirebaseBackendTests(SimpleTestCase):
+    def test_firebase_backend_logs_message_and_returns_true(self):
+        with self.assertLogs('notifications.sms', level='WARNING') as logs:
             result = sms.send_sms('+91 98765 43210', 'hello 123456')
-        return result, urlopen
-
-    def test_success_sends_to_the_ten_digit_number(self):
-        result, urlopen = self.send(fake_response(body={'return': True, 'request_id': 'r', 'message': ['ok']}))
         self.assertTrue(result)
-        request = urlopen.call_args.args[0]
-        self.assertIn('numbers=9876543210', request.data.decode())
-        self.assertEqual(request.get_header('Authorization'), 'key')
+        self.assertIn('******3210', logs.output[0])
 
-    def test_provider_rejection_is_reported_with_its_reason(self):
-        error = http_error(400, {'return': False, 'status_code': 999,
-                                 'message': 'Complete a single transaction of at least 100 INR in wallet first'})
-        with self.assertLogs('notifications.sms', level='ERROR') as logs:
-            result, _ = self.send(error=error)
-        self.assertFalse(result)
-        self.assertIn('FAILED', logs.output[0])
-        self.assertIn('999', logs.output[0])
-        self.assertIn('wallet', logs.output[0])
 
-    def test_return_false_with_http_200_is_still_a_failure(self):
-        with self.assertLogs('notifications.sms', level='ERROR'):
-            result, _ = self.send(fake_response(body={'return': False, 'message': ['Invalid numbers']}))
-        self.assertFalse(result)
+    def test_invalid_number_is_never_sent(self):
+        self.assertFalse(sms.send_sms('12345', 'hello'))
+        self.assertFalse(sms.send_sms('', 'hello'))
 
-    def test_network_error_does_not_raise(self):
-        with self.assertLogs('notifications.sms', level='ERROR'):
-            result, _ = self.send(error=OSError('network down'))
-        self.assertFalse(result)
-
-    @override_settings(FAST2SMS_API_KEY='')
-    def test_missing_api_key_fails_clearly_without_calling_the_provider(self):
-        with self.assertLogs('notifications.sms', level='ERROR') as logs:
-            result, urlopen = self.send(fake_response())
-        self.assertFalse(result)
-        self.assertFalse(urlopen.called)
-        self.assertIn('FAST2SMS_API_KEY', logs.output[0])
-
-    def test_invalid_number_is_never_sent_to_the_provider(self):
-        with mock.patch('notifications.sms.urllib.request.urlopen') as urlopen:
-            self.assertFalse(sms.send_sms('12345', 'hello'))
-            self.assertFalse(sms.send_sms('', 'hello'))
-        self.assertFalse(urlopen.called)
 
 
 class OtherBackendTests(SimpleTestCase):

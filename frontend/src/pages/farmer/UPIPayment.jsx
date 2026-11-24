@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { getPaymentStatus, verifyPayment } from '../../api/orders';
 import { formatPrice } from '../../utils/helpers';
 import Spinner from '../../components/common/Spinner';
-import { Smartphone, Info, ShieldCheck, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Smartphone, Info, ShieldCheck, Clock } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function UPIPayment() {
@@ -32,7 +32,7 @@ export default function UPIPayment() {
     return () => {
       if (pollingInterval.current) clearInterval(pollingInterval.current);
     };
-  }, [paymentId]);
+  }, [paymentId, navigate]);
 
   // Generate QR Code once UPI URI and canvas are ready
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function UPIPayment() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, navigate]);
 
   // Polling payment status
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function UPIPayment() {
     return () => {
       if (pollingInterval.current) clearInterval(pollingInterval.current);
     };
-  }, [loading, payment, paymentId]);
+  }, [loading, payment, paymentId, navigate]);
 
   // Handle Demo mode bypass / Instant verify
   const handleInstantVerify = () => {

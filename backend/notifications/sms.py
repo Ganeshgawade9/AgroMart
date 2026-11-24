@@ -1,10 +1,9 @@
 """Minimal SMS sender used for OTPs.
 
 Pick the provider with the SMS_BACKEND setting:
-  console  - log the message only (default, for development). NOTHING is sent
-             to a phone: the OTP only appears in the server log.
-  fast2sms - Fast2SMS Quick SMS route (Indian numbers)
+  console  - log the message only (default, for development).
   twilio   - Twilio Messages API
+  firebase - Handled via Firebase Phone Auth on frontend & verified on backend
 
 Never raises: a failed SMS must not break the request that triggered it.
 send_sms() returns True only when the provider accepted the message, and logs
@@ -23,6 +22,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 _INDIAN_MOBILE = re.compile(r'[6-9]\d{9}')
+_OTP_CODE = re.compile(r'(?<!\d)\d{6}(?!\d)')
 
 
 def normalize_phone(phone):
@@ -65,25 +65,7 @@ def _post(url, data, headers):
         raw = response.read().decode('utf-8', 'replace')
         if not 200 <= response.status < 300:
             return False, f'HTTP {response.status}'
-    try:
-        body = json.loads(raw)
-    except ValueError:
-        return True, ''
-    # Fast2SMS answers {"return": true|false, "message": [...]}
-    if isinstance(body, dict) and body.get('return') is False:
-        message = body.get('message')
-        return False, '; '.join(map(str, message)) if isinstance(message, list) else str(message or 'rejected')
     return True, ''
-
-
-def _send_fast2sms(number, message):
-    if not settings.FAST2SMS_API_KEY:
-        return False, 'FAST2SMS_API_KEY is not set'
-    payload = urllib.parse.urlencode({'route': 'q', 'message': message, 'numbers': number, 'flash': '0'}).encode()
-    return _post('https://www.fast2sms.com/dev/bulkV2', payload, {
-        'authorization': settings.FAST2SMS_API_KEY,
-        'Content-Type': 'application/x-www-form-urlencoded',
-    })
 
 
 def _send_twilio(number, message):
@@ -107,24 +89,22 @@ def send_sms(phone, message):
 
     backend = settings.SMS_BACKEND
     try:
-        if backend == 'fast2sms':
-            ok, reason = _send_fast2sms(number, message)
-        elif backend == 'twilio':
+        if backend == 'twilio':
             ok, reason = _send_twilio(number, message)
-        elif backend == 'console':
-            # Development only: the message (and the OTP in it) goes to the server log, not to a phone
+        elif backend in ('console', 'firebase'):
+            # Console or Firebase-handled: message is printed in terminal server log
             logger.warning('[SMS console] to %s: %s', mask_phone(number), message)
             return True
         else:
-            logger.error('SMS not sent: unknown SMS_BACKEND %r (use console, fast2sms or twilio)', backend)
+            logger.error('SMS not sent: unknown SMS_BACKEND %r (use console, firebase, or twilio)', backend)
             return False
     except urllib.error.HTTPError as exc:
         ok, reason = False, _provider_error(exc)
-    except Exception as exc:  # network down, timeout, DNS ...
+    except Exception as exc:
         ok, reason = False, f'{type(exc).__name__}: {exc}'
 
     if ok:
         logger.info('SMS sent via %s to %s', backend, mask_phone(number))
     else:
         logger.error('SMS to %s via %s FAILED: %s', mask_phone(number), backend, reason)
-    return ok
+    return ok

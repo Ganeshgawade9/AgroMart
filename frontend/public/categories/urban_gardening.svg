@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="100%" height="100%">
+  <defs>
+    <filter id="potsw" x="-10%" y="-10%" width="130%" height="130%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity="0.2"/>
+    </filter>
+  </defs>
+  <g transform="translate(10, 8)">
+    <!-- Terracotta Plant Pot -->
+    <path d="M 62 108 L 126 108 L 116 165 L 72 165 Z" fill="#D97706" filter="url(#potsw)"/>
+    <rect x="58" y="98" width="72" height="12" rx="3" fill="#B45309"/>
+    
+    <!-- Plant Leaves -->
+    <path d="M 94 98 C 90 68, 56 64, 48 80 C 45 96, 76 96, 94 98 Z" fill="#15803D"/>
+    <path d="M 94 98 C 100 58, 134 54, 140 70 C 144 86, 110 96, 94 98 Z" fill="#22C55E"/>
+    <path d="M 94 98 C 92 48, 70 36, 60 48 C 50 64, 78 84, 94 98 Z" fill="#16A34A"/>
+    <path d="M 94 98 C 94 44, 116 34, 126 44 C 136 60, 110 84, 94 98 Z" fill="#4ADE80"/>
+    <path d="M 94 98 C 94 30, 94 20, 94 30 Z" stroke="#14532D" stroke-width="3.5"/>
+
+    <!-- Garden Hand Spray Mister Bottle -->
+    <g transform="translate(130, 80)" filter="url(#potsw)">
+      <path d="M 12 24 L 28 24 L 34 75 L 6 75 Z" fill="#0284C7" rx="3"/>
+      <rect x="15" y="14" width="10" height="10" fill="#0369A1"/>
+      <path d="M 12 14 L 8 4 L 25 4 L 27 14 Z" fill="#F8FAFC"/>
+      <path d="M 8 6 L -3 6 L -3 11 L 6 11 Z" fill="#0284C7"/>
+      <path d="M 12 14 L 2 24" stroke="#F8FAFC" stroke-width="3" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

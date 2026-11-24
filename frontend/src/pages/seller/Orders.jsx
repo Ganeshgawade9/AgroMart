@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { getSellerOrders, updateOrderStatus } from '../../api/orders';
 import { formatPrice, formatDate, getStatusColor, getStatusLabel } from '../../utils/helpers';
@@ -24,12 +24,12 @@ export default function SellerOrders() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(null);
 
-  const fetchOrders = () => {
+  const fetchOrders = useCallback(() => {
     setLoading(true);
     getSellerOrders(activeTab).then(r => setOrders(r.data.results || r.data)).catch(() => {}).finally(() => setLoading(false));
-  };
+  }, [activeTab]);
 
-  useEffect(() => { fetchOrders(); }, [activeTab]);
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     setUpdating(orderId);

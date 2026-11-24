@@ -56,7 +56,7 @@ export default function LocationPicker({ initialLat, initialLng, onSave, onClose
                         <Navigation className="w-3.5 h-3.5" /> {locLoading ? 'Getting location...' : 'Use My Current Location'}
                     </button>
 
-                    <div style={{ height: '350px' }} className="rounded-lg overflow-hidden border border-gray-200">
+                    <div style={{ height: '350px' }} className="rounded-lg overflow-hidden border border-gray-200 relative z-0 isolate">
                         <MapContainer
                             center={[startLat, startLng]}
                             zoom={picked ? 14 : 5}

@@ -28,7 +28,7 @@ export default function DeliveryTracking({ orderId, orderStatus, viewer = 'farme
     load();
     const t = setInterval(load, POLL_MS);
     return () => { cancelled = true; clearInterval(t); };
-  }, [orderId, orderStatus]);
+  }, [orderId, orderStatus, onChange]);
 
   if (!tracking || !['finding_rider', 'rider_assigned', 'on_the_way'].includes(tracking.stage)) return null;
 

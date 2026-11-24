@@ -13,6 +13,11 @@ export const updateSellerProfile = (data) => api.patch('/auth/seller-profile/', 
   headers: { 'Content-Type': 'multipart/form-data' }
 });
 
+// Registration OTP: mobile number verification
+export const sendRegisterOtp = (data) => api.post('/auth/send-register-otp/', data);
+export const verifyRegisterOtp = (data) => api.post('/auth/verify-register-otp/', data);
+
 // Forgot password: OTP is sent by SMS to the account's registered mobile number
 export const forgotPassword = (identifier) => api.post('/auth/forgot-password/', { identifier });
 export const resetPassword = (data) => api.post('/auth/reset-password/', data);
+

@@ -11,8 +11,9 @@ import {
 } from 'lucide-react';
 
 import { getCart } from '../../api/products';
-import { initiatePayment } from '../../api/orders';
+import { initiatePayment, verifyPayment } from '../../api/orders';
 import { getProfile } from '../../api/auth';
+import RazorpayModal from '../../components/payment/RazorpayModal';
 
 import {
   formatPrice,
@@ -119,6 +120,29 @@ export default function Checkout() {
 
   const [discountAmount, setDiscountAmount] =
     useState(0);
+
+  const [activeRazorpaySession, setActiveRazorpaySession] =
+    useState(null);
+
+  const handleRazorpaySuccess = async (payload) => {
+    try {
+      const res = await verifyPayment(activeRazorpaySession.payment_id, payload);
+      useCartStore.getState().clear();
+      toast.success('Razorpay Payment Confirmed! 🎉');
+      const orderId = res?.data?.order_id || activeRazorpaySession.order_id;
+      setTimeout(() => {
+        if (orderId) {
+          navigate(`/farmer/order-success/${orderId}`);
+        } else {
+          navigate('/farmer/orders');
+        }
+      }, 3200);
+      return res.data;
+    } catch (err) {
+      toast.error(err?.response?.data?.error || 'Payment verification failed');
+      throw err;
+    }
+  };
 
 
   /* =========================================
@@ -581,10 +605,18 @@ export default function Checkout() {
           );
         }
 
-        navigate(
-          `/farmer/payment/razorpay/${paymentData.payment_id}`
-        );
+        const firstProduct = cart.items[0]?.product;
+        const shop_name = firstProduct?.seller_shop_name || 'AgroConnect Seller';
 
+        setActiveRazorpaySession({
+          ...paymentData,
+          amount: finalTotal,
+          shop_name,
+          subtotal,
+          gst,
+          delivery_charge: delivery,
+        });
+        setPlacing(false);
         return;
       }
 
@@ -1627,6 +1659,16 @@ export default function Checkout() {
         </div>
 
       </div>
+
+      {/* Razorpay Interactive Modal with Animations */}
+      {activeRazorpaySession && (
+        <RazorpayModal
+          payment={activeRazorpaySession}
+          onSuccess={handleRazorpaySuccess}
+          onFailure={(err) => toast.error(err?.reason || 'Payment was not completed')}
+          onClose={() => setActiveRazorpaySession(null)}
+        />
+      )}
 
     </div>
   );

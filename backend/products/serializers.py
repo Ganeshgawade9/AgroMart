@@ -1,5 +1,6 @@
 from rest_framework import serializers
-from .models import Product, Category, Brand, Review, Wishlist, Cart
+from .models import (Product, Category, Brand, Review, Wishlist, Cart, Banner,
+                     ProductNotification, HomeCategory, Crop)
 import math
 
 
@@ -26,19 +27,39 @@ class ReviewSerializer(serializers.ModelSerializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(source='category', read_only=True)
     brand_name = serializers.CharField(source='brand.name', read_only=True)
+    brand_id = serializers.PrimaryKeyRelatedField(source='brand', read_only=True)
     seller_shop_name = serializers.CharField(source='seller.seller_profile.shop_name', read_only=True, default='')
     seller_shop_logo = serializers.SerializerMethodField()
     is_in_stock = serializers.ReadOnlyField()
     distance_km = serializers.SerializerMethodField()
+    is_notify_subscribed = serializers.SerializerMethodField()
+    is_wishlisted = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
-        fields = ['id', 'name', 'image', 'image2', 'image3', 'price', 'mrp', 'discount_percent',
+        fields = ['id', 'name', 'description', 'image', 'image2', 'image3', 'price', 'mrp', 'discount_percent',
                   'stock', 'unit', 'weight', 'rating', 'total_reviews',
-                  'category_name', 'brand_name', 'seller_shop_name', 'seller_shop_logo',
+                  'category_name', 'category_id', 'brand_name', 'brand_id', 'seller_shop_name', 'seller_shop_logo',
                   'is_in_stock', 'has_free_delivery', 'is_organic',
-                  'is_featured', 'distance_km', 'created_at']
+                  'is_featured', 'distance_km', 'is_notify_subscribed', 'is_wishlisted', 'created_at']
+
+    def get_is_wishlisted(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return False
+        if not hasattr(request, '_user_wishlist_ids'):
+            request._user_wishlist_ids = set(
+                Wishlist.objects.filter(user=request.user).values_list('product_id', flat=True)
+            )
+        return obj.id in request._user_wishlist_ids
+
+    def get_is_notify_subscribed(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user or not request.user.is_authenticated:
+            return False
+        return ProductNotification.objects.filter(user=request.user, product=obj, is_notified=False).exists()
 
     def get_seller_shop_logo(self, obj):
         try:
@@ -53,13 +74,10 @@ class ProductListSerializer(serializers.ModelSerializer):
         return None
 
     def get_distance_km(self, obj):
-        # The product list view annotates `distance` in SQL; reuse it when present
-        annotated = getattr(obj, 'distance', None)
-        if annotated is not None:
-            return round(float(annotated), 1)
         request = self.context.get('request')
         if not request:
-            return None
+            annotated = getattr(obj, 'distance', None)
+            return round(float(annotated), 1) if annotated is not None else None
         try:
             farmer_lat = float(request.query_params.get('lat', 0))
             farmer_lng = float(request.query_params.get('lng', 0))
@@ -67,15 +85,30 @@ class ProductListSerializer(serializers.ModelSerializer):
             seller_lng = float(obj.seller.longitude or 0)
             if not (farmer_lat and farmer_lng and seller_lat and seller_lng):
                 return None
-            # Haversine formula
-            R = 6371
-            dlat = math.radians(seller_lat - farmer_lat)
-            dlng = math.radians(seller_lng - farmer_lng)
-            a = math.sin(dlat/2)**2 + math.cos(math.radians(farmer_lat)) * math.cos(math.radians(seller_lat)) * math.sin(dlng/2)**2
-            dist = R * 2 * math.asin(math.sqrt(a))
-            return round(dist, 1)
+
+            from maps.routing import fetch_route_info
+
+            # Always default to driving distance on motorable roads
+            mode = request.query_params.get('mode', 'driving').lower()
+            if mode not in ('driving', 'walking'):
+                mode = 'driving'
+
+
+            # Cache per-request so 20 products from the same seller only query route once
+            if not hasattr(request, '_seller_road_distances'):
+                request._seller_road_distances = {}
+            cache_key = (round(seller_lat, 5), round(seller_lng, 5), mode)
+            if cache_key in request._seller_road_distances:
+                return request._seller_road_distances[cache_key]
+
+            route_info = fetch_route_info(farmer_lat, farmer_lng, seller_lat, seller_lng, mode=mode, timeout=1.5)
+            road_km = route_info['distance_km']
+            request._seller_road_distances[cache_key] = road_km
+            return road_km
         except Exception:
-            return None
+            annotated = getattr(obj, 'distance', None)
+            return round(float(annotated), 1) if annotated is not None else None
+
 
 
 class ProductDetailSerializer(serializers.ModelSerializer):
@@ -86,10 +119,22 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     seller_shop_logo = serializers.SerializerMethodField()
     seller_location = serializers.ReadOnlyField()
     is_in_stock = serializers.ReadOnlyField()
+    distance_km = serializers.SerializerMethodField()
+    is_notify_subscribed = serializers.SerializerMethodField()
+    is_wishlisted = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = '__all__'
+
+    def get_is_wishlisted(self, obj):
+        return ProductListSerializer.get_is_wishlisted(self, obj)
+
+    def get_is_notify_subscribed(self, obj):
+        return ProductListSerializer.get_is_notify_subscribed(self, obj)
+
+    def get_distance_km(self, obj):
+        return ProductListSerializer.get_distance_km(self, obj)
 
     def get_seller_shop_logo(self, obj):
         try:
@@ -151,3 +196,54 @@ class WishlistSerializer(serializers.ModelSerializer):
             product=validated_data['product']
         )
         return wishlist_item
+
+
+class BannerSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Banner
+        fields = ['id', 'title', 'subtitle', 'image', 'image_url', 'link_url', 'is_active', 'order', 'created_at']
+        read_only_fields = ['id', 'created_at', 'image_url']
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url
+
+
+class HomeCategorySerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = HomeCategory
+        fields = ['id', 'name', 'slug', 'title_key', 'image', 'default_image', 'bg_color', 'link_url', 'order']
+
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.default_image
+
+
+class CropSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Crop
+        fields = ['id', 'name', 'slug', 'search_query', 'image', 'default_image', 'order', 'is_featured']
+
+    def get_image(self, obj):
+        if obj.image:
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(obj.image.url)
+            return obj.image.url
+        return obj.default_image
+
+

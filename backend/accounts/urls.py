@@ -4,6 +4,8 @@ from . import views
 
 urlpatterns = [
     path('register/', views.RegisterView.as_view(), name='register'),
+    path('send-register-otp/', views.SendRegisterOTPView.as_view(), name='send_register_otp'),
+    path('verify-register-otp/', views.VerifyRegisterOTPView.as_view(), name='verify_register_otp'),
     path('login/', views.CustomTokenObtainPairView.as_view(), name='login'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('logout/', views.LogoutView.as_view(), name='logout'),

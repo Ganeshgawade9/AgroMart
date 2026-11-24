@@ -50,6 +50,9 @@ const useLocationStore = create(
           );
         }),
 
+      radius: 20,
+      setRadius: (radius) => set({ radius: Number(radius) || 20 }),
+
       setManual: ({ lat, lng, label }) =>
         set({ lat, lng, label, source: 'manual', error: null }),
 
@@ -57,7 +60,7 @@ const useLocationStore = create(
     }),
     {
       name: 'location-store',
-      partialize: (s) => ({ lat: s.lat, lng: s.lng, label: s.label, source: s.source }),
+      partialize: (s) => ({ lat: s.lat, lng: s.lng, label: s.label, source: s.source, radius: s.radius }),
     }
   )
 );

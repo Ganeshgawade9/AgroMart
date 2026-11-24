@@ -2,11 +2,11 @@ from datetime import timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from .models import PasswordResetOTP
+from .models import PasswordResetOTP, RegistrationOTP
 
 User = get_user_model()
 
@@ -52,7 +52,9 @@ class PasswordResetOtpTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(sms.called)
         known, _ = self.request_otp()
-        self.assertEqual(response.json(), known.json())
+        self.assertEqual(response.json()['message'], known.json()['message'])
+        self.assertNotIn('phone', response.json())
+        self.assertIn('phone', known.json())
 
     def test_account_without_mobile_gets_no_sms(self):
         User.objects.filter(pk=self.user.pk).update(phone='')
@@ -99,7 +101,9 @@ class PasswordResetOtpTests(TestCase):
         self.assertEqual(response.status_code, 400)
 
 
+@override_settings(REQUIRE_REGISTRATION_OTP=False)
 class MobileNumberRulesTests(TestCase):
+
     """OTPs go to the number the user registered with, so that number must be a real mobile."""
 
     def register(self, **overrides):
@@ -146,3 +150,96 @@ class MobileNumberRulesTests(TestCase):
             APIClient().post('/api/auth/forgot-password/', {'identifier': user.email}, format='json')
         sms.assert_called_once()
         self.assertEqual(sms.call_args.args[0], '9876543210')
+
+
+@override_settings(REQUIRE_REGISTRATION_OTP=True)
+class RegistrationOtpTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.phone = '9876543210'
+
+    def send_otp(self, phone='9876543210', email=''):
+        with mock.patch('accounts.otp.send_sms') as sms:
+            response = self.client.post('/api/auth/send-register-otp/', {'phone': phone, 'email': email}, format='json')
+        return response, sms
+
+    def code_from(self, sms):
+        message = sms.call_args.args[1]
+        return next(word for word in message.split() if word.isdigit() and len(word) == 6)
+
+    def test_send_register_otp_sends_sms(self):
+        response, sms = self.send_otp(self.phone)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(sms.called)
+        self.assertEqual(sms.call_args.args[0], self.phone)
+        code = self.code_from(sms)
+        self.assertEqual(len(code), 6)
+
+    def test_send_register_otp_rejects_invalid_phone(self):
+        response, sms = self.send_otp('12345')
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(sms.called)
+
+    def test_send_register_otp_rejects_already_registered_phone(self):
+        User.objects.create_user(email='existing@example.com', password='pwd', phone='9876543210', full_name='Ex')
+        response, sms = self.send_otp('9876543210')
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(sms.called)
+
+    def test_send_register_otp_throttling(self):
+        _, first = self.send_otp(self.phone)
+        self.assertTrue(first.called)
+        response, second = self.send_otp(self.phone)
+        self.assertEqual(response.status_code, 429)
+        self.assertFalse(second.called)
+
+    def test_verify_register_otp_endpoint(self):
+        _, sms = self.send_otp(self.phone)
+        code = self.code_from(sms)
+
+        # Wrong code
+        bad = self.client.post('/api/auth/verify-register-otp/', {'phone': self.phone, 'otp': '000000'}, format='json')
+        self.assertEqual(bad.status_code, 400)
+
+        # Correct code
+        good = self.client.post('/api/auth/verify-register-otp/', {'phone': self.phone, 'otp': code}, format='json')
+        self.assertEqual(good.status_code, 200)
+        self.assertTrue(good.json().get('verified'))
+
+    def test_register_with_otp_creates_user_and_consumes_otp(self):
+        _, sms = self.send_otp(self.phone)
+        code = self.code_from(sms)
+
+        body = {
+            'email': 'newfarmer@example.com',
+            'password': 'password123',
+            'password2': 'password123',
+            'full_name': 'New Farmer',
+            'role': 'farmer',
+            'phone': self.phone,
+            'otp': code,
+        }
+        response = self.client.post('/api/auth/register/', body, format='json')
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(User.objects.filter(email='newfarmer@example.com').exists())
+
+        # Cannot reuse the same OTP
+        body['email'] = 'another@example.com'
+        body['phone'] = '9876543211'
+        body['otp'] = code
+        fail = self.client.post('/api/auth/register/', body, format='json')
+        self.assertEqual(fail.status_code, 400)
+
+    def test_register_without_otp_fails_when_required(self):
+        body = {
+            'email': 'newfarmer@example.com',
+            'password': 'password123',
+            'password2': 'password123',
+            'full_name': 'New Farmer',
+            'role': 'farmer',
+            'phone': self.phone,
+        }
+        response = self.client.post('/api/auth/register/', body, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('otp', response.json())
+

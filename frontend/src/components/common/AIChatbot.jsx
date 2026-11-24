@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, X, Send, MapPin, ShoppingBag, Mic, MicOff } from 'lucide-react';
+import { Bot, X, Send, MapPin, Mic, MicOff } from 'lucide-react';
 import axios from 'axios';
 import useLocation from '../../hooks/useLocation';
 

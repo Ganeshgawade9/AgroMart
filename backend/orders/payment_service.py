@@ -181,9 +181,15 @@ class RazorpayGateway(BasePaymentGateway):
                 payment.save()
                 return False
 
+        if data.get('simulate_failure'):
+            payment.status = Payment.FAILED
+            payment.failure_reason = data.get('failure_reason') or 'Transaction declined by customer bank (Sandbox Demo)'
+            payment.save()
+            return False
+
         # Sandbox Simulation
         payment.status = Payment.PAID
-        payment.transaction_id = f"pay_{uuid.uuid4().hex[:14]}"
+        payment.transaction_id = razorpay_payment_id or f"pay_{uuid.uuid4().hex[:14]}"
         payment.reference_number = f"REF{random.randint(100000000, 999999999)}"
         payment.gateway_payment_id = payment.transaction_id
         payment.paid_at = now
@@ -449,16 +455,17 @@ class PaymentService:
         from django.core.files.base import ContentFile
 
         invoice_number = f"INV-{timezone.now().year}-{order.id:04d}"
-        invoice = Invoice.objects.create(
+        invoice, created = Invoice.objects.get_or_create(
             order=order,
-            invoice_number=invoice_number
+            defaults={'invoice_number': invoice_number}
         )
 
-        try:
-            pdf_data = generate_invoice_pdf(order)
-            invoice.pdf_file.save(f"invoice_{order.order_number}.pdf", ContentFile(pdf_data), save=True)
-        except Exception as e:
-            print(f"Error generating invoice PDF during checkout: {e}")
+        if created or not invoice.pdf_file:
+            try:
+                pdf_data = generate_invoice_pdf(order)
+                invoice.pdf_file.save(f"invoice_{order.order_number}.pdf", ContentFile(pdf_data), save=True)
+            except Exception as e:
+                print(f"Error generating invoice PDF during checkout: {e}")
 
         # Send Notifications
         from notifications.utils import send_notification

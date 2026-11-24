@@ -1,11 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Bell, CheckCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Bell, CheckCheck, ExternalLink } from 'lucide-react';
 import { getNotifications, markAllRead } from '../api/notifications';
 import { formatDate } from '../utils/helpers';
 import Spinner from '../components/common/Spinner';
 import toast from 'react-hot-toast';
 
-const TYPE_ICONS = { new_order:'🛒', order_update:'📦', payment:'💳', low_stock:'⚠️', offer:'🎁' };
+const TYPE_ICONS = {
+  new_order: '🛒',
+  order_update: '📦',
+  payment: '💳',
+  low_stock: '⚠️',
+  offer: '🎁',
+  back_in_stock: '🔔'
+};
 
 export default function Notifications() {
   const [notifs, setNotifs] = useState([]);
@@ -37,6 +45,14 @@ export default function Notifications() {
               <span className="text-2xl flex-shrink-0">{TYPE_ICONS[n.notification_type] || '🔔'}</span>
               <div className="flex-1">
                 <p className={`text-sm ${n.is_read ? 'text-gray-700' : 'text-gray-900 font-medium'}`}>{n.message}</p>
+                {n.notification_type === 'back_in_stock' && n.order_id && (
+                  <Link
+                    to={`/products/${n.order_id}`}
+                    className="inline-flex items-center gap-1 text-xs text-primary-600 font-semibold hover:underline mt-1.5"
+                  >
+                    View Product & Order Now <ExternalLink className="w-3 h-3" />
+                  </Link>
+                )}
                 <p className="text-xs text-gray-400 mt-1">{formatDate(n.created_at)}</p>
               </div>
               {!n.is_read && <span className="w-2 h-2 bg-primary-500 rounded-full flex-shrink-0 mt-1.5" />}

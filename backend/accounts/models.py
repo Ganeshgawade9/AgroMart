@@ -145,3 +145,22 @@ class PasswordResetOTP(models.Model):
 
     def __str__(self):
         return f"Password reset OTP for {self.user_id} ({'used' if self.used_at else 'open'})"
+
+
+class RegistrationOTP(models.Model):
+    """One-time code sent by SMS to verify a mobile number during registration."""
+    phone = models.CharField(max_length=15, db_index=True)
+    code_hash = models.CharField(max_length=64)
+    attempts = models.PositiveSmallIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+    verified_at = models.DateTimeField(null=True, blank=True)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        status = 'used' if self.used_at else ('verified' if self.verified_at else 'pending')
+        return f"Registration OTP for {self.phone} ({status})"
+

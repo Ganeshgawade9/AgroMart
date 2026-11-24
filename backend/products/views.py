@@ -5,11 +5,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, F, Value, FloatField, IntegerField, Case, When, Count, Min, Max
 from django.db.models.functions import Cast, Cos, Sin, ACos, Radians, Least, Greatest
 import math
-from .models import Product, Category, Brand, Review, Wishlist, Cart
+from .models import (Product, Category, Brand, Review, Wishlist, Cart, Banner,
+                     ProductNotification, HomeCategory, Crop)
 from .serializers import (ProductListSerializer, ProductDetailSerializer,
     ProductCreateUpdateSerializer, CategorySerializer, BrandSerializer,
-    ReviewSerializer, CartSerializer, WishlistSerializer)
+    ReviewSerializer, CartSerializer, WishlistSerializer, BannerSerializer,
+    HomeCategorySerializer, CropSerializer)
 from .filters import ProductFilter
+from accounts.admin_views import IsAdminUser
 
 
 def distance_expression(lat, lng):
@@ -60,12 +63,21 @@ class IsSellerOrReadOnly(permissions.BasePermission):
         return obj.seller == request.user
 
 
+from rest_framework.pagination import PageNumberPagination
+
+class ProductPagination(PageNumberPagination):
+    page_size = 500
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
+
+
 class ProductListView(generics.ListAPIView):
     serializer_class = ProductListSerializer
     permission_classes = [permissions.AllowAny]
+    pagination_class = ProductPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_class = ProductFilter
-    search_fields = ['name', 'description', 'seller__seller_profile__shop_name',
+    search_fields = ['name', 'description', 'brand__name', 'seller__seller_profile__shop_name',
                      'seller__village', 'seller__taluka', 'seller__district']
     ordering_fields = ['price', 'rating', 'created_at', 'distance']
     ordering = ['-created_at']
@@ -105,6 +117,13 @@ class ProductListView(generics.ListAPIView):
         return qs
 
     def filter_queryset(self, queryset):
+        # Allow random ordering (e.g. for homepage discovery / ?ordering=random / ?ordering=?)
+        order_param = self.request.query_params.get('ordering')
+        if order_param in ('random', '?'):
+            for backend in list(self.filter_backends):
+                if backend != filters.OrderingFilter:
+                    queryset = backend().filter_queryset(self.request, queryset, self)
+            return queryset.order_by('sold_out', '?')
         # Sold-out products stay visible (with a "Sold out" label) but come after the available ones
         return sold_out_last(super().filter_queryset(queryset))
 
@@ -140,14 +159,24 @@ class ReviewCreateView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def perform_create(self, serializer):
+        from django.shortcuts import get_object_or_404
         product_id = self.kwargs['product_id']
-        product = Product.objects.get(id=product_id)
-        review = serializer.save(user=self.request.user, product=product)
+        product = get_object_or_404(Product, id=product_id, is_active=True)
+        existing = Review.objects.filter(user=self.request.user, product=product).first()
+        if existing:
+            existing.rating = serializer.validated_data.get('rating', existing.rating)
+            existing.comment = serializer.validated_data.get('comment', existing.comment)
+            existing.save(update_fields=['rating', 'comment'])
+        else:
+            serializer.save(user=self.request.user, product=product)
+
         # Update product rating
         reviews = product.reviews.all()
-        product.rating = sum(r.rating for r in reviews) / reviews.count()
-        product.total_reviews = reviews.count()
-        product.save(update_fields=['rating', 'total_reviews'])
+        count = reviews.count()
+        if count > 0:
+            product.rating = round(sum(r.rating for r in reviews) / count, 2)
+            product.total_reviews = count
+            product.save(update_fields=['rating', 'total_reviews'])
 
 
 class CartView(generics.ListCreateAPIView):
@@ -188,11 +217,47 @@ class WishlistView(generics.ListCreateAPIView):
         return Wishlist.objects.filter(user=self.request.user).select_related('product')
 
 
-class WishlistItemView(generics.DestroyAPIView):
+class WishlistItemView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def get_queryset(self):
-        return Wishlist.objects.filter(user=self.request.user)
+    def delete(self, request, pk):
+        item = Wishlist.objects.filter(user=request.user, pk=pk).first()
+        if not item:
+            item = Wishlist.objects.filter(user=request.user, product_id=pk).first()
+        if item:
+            item.delete()
+            return Response({'in_wishlist': False, 'message': 'Removed from wishlist'}, status=status.HTTP_200_OK)
+        return Response({'in_wishlist': False, 'message': 'Item not in wishlist'}, status=status.HTTP_200_OK)
+
+
+class ToggleWishlistView(APIView):
+    """Toggle adding or removing a product from the user's wishlist."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        product_id = request.data.get('product_id')
+        if not product_id:
+            return Response({'error': 'product_id is required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            product = Product.objects.get(pk=product_id, is_active=True)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        item = Wishlist.objects.filter(user=request.user, product=product).first()
+        if item:
+            item.delete()
+            return Response({
+                'in_wishlist': False,
+                'product_id': product.id,
+                'message': f'Removed {product.name} from wishlist'
+            }, status=status.HTTP_200_OK)
+        else:
+            Wishlist.objects.create(user=request.user, product=product)
+            return Response({
+                'in_wishlist': True,
+                'product_id': product.id,
+                'message': f'Added {product.name} to wishlist!'
+            }, status=status.HTTP_200_OK)
 
 
 class CategoryListView(generics.ListAPIView):
@@ -202,9 +267,36 @@ class CategoryListView(generics.ListAPIView):
 
 
 class BrandListView(generics.ListAPIView):
-    queryset = Brand.objects.filter(is_active=True)
     serializer_class = BrandSerializer
     permission_classes = [permissions.AllowAny]
+
+    def get_queryset(self):
+        qs = Brand.objects.filter(is_active=True)
+        category = self.request.query_params.get('category')
+        if category:
+            qs = qs.filter(category_group__icontains=category)
+        return qs.order_by('name')
+
+
+class GroupedBrandsView(APIView):
+    """Returns all active brands organized into SEEDS, CROP PROTECTION, CROP NUTRITION, IMPLEMENTS, and MOST POPULAR."""
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        all_brands = Brand.objects.filter(is_active=True).order_by('name')
+        data = {
+            'seeds': [],
+            'crop_protection': [],
+            'crop_nutrition': [],
+            'implements': [],
+            'popular': []
+        }
+        for b in all_brands:
+            groups = [g.strip() for g in b.category_group.split(',') if g.strip()]
+            for g in groups:
+                if g in data:
+                    data[g].append({'id': b.id, 'name': b.name})
+        return Response(data)
 
 
 class FilterOptionsView(APIView):
@@ -251,4 +343,164 @@ class FeaturedProductsView(generics.ListAPIView):
 
     def get_queryset(self):
         qs = with_sold_out_flag(Product.objects.filter(is_active=True, is_featured=True))
-        return sold_out_last(qs)
+        return qs.order_by('sold_out', '?')
+
+
+class BannerListView(generics.ListAPIView):
+    """Public list of active promotional banners for the homepage hero slider."""
+    serializer_class = BannerSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None
+
+    def get_queryset(self):
+        return Banner.objects.filter(is_active=True).order_by('order', '-created_at')
+
+
+
+class AdminBannerListCreateView(APIView):
+    """Admin endpoint to list all banners and upload single or multiple banners."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        banners = Banner.objects.all().order_by('order', '-created_at')
+        serializer = BannerSerializer(banners, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    def post(self, request):
+        files = request.FILES.getlist('images')
+        single_image = request.FILES.get('image')
+
+        # Multi-file upload support
+        if files:
+            created_banners = []
+            base_order = Banner.objects.count()
+            title = request.data.get('title', '').strip()
+            subtitle = request.data.get('subtitle', '').strip()
+            link_url = request.data.get('link_url', '').strip()
+
+            for idx, img_file in enumerate(files):
+                banner_title = title if (len(files) == 1 or not title) else f"{title} #{idx + 1}"
+                banner = Banner.objects.create(
+                    image=img_file,
+                    title=banner_title,
+                    subtitle=subtitle,
+                    link_url=link_url,
+                    order=base_order + idx,
+                    is_active=True,
+                )
+                created_banners.append(banner)
+
+            serializer = BannerSerializer(created_banners, many=True, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+        if single_image:
+            serializer = BannerSerializer(data=request.data, context={'request': request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({'error': 'No image(s) provided. Upload via "image" or "images" field.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminBannerDetailView(APIView):
+    """Admin endpoint to update or delete a specific banner."""
+    permission_classes = [IsAdminUser]
+
+    def patch(self, request, pk):
+        try:
+            banner = Banner.objects.get(pk=pk)
+        except Banner.DoesNotExist:
+            return Response({'error': 'Banner not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = BannerSerializer(banner, data=request.data, partial=True, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        try:
+            banner = Banner.objects.get(pk=pk)
+        except Banner.DoesNotExist:
+            return Response({'error': 'Banner not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if banner.image:
+            try:
+                banner.image.delete(save=False)
+            except Exception:
+                pass
+        banner.delete()
+        return Response({'message': 'Banner deleted successfully'}, status=status.HTTP_200_OK)
+
+
+class ProductNotifyMeView(APIView):
+    """Subscribe or unsubscribe user from restock alerts for a sold out product."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            product = Product.objects.get(pk=pk, is_active=True)
+        except Product.DoesNotExist:
+            return Response({'error': 'Product not found'}, status=404)
+
+        alert, created = ProductNotification.objects.get_or_create(
+            user=request.user,
+            product=product,
+            defaults={'is_notified': False}
+        )
+
+        if not created and alert.is_notified:
+            # Re-activate alert if previously notified
+            alert.is_notified = False
+            alert.notified_at = None
+            alert.save(update_fields=['is_notified', 'notified_at'])
+            return Response({
+                'subscribed': True,
+                'message': f'You will be notified as soon as {product.name} is back in stock! 🔔'
+            })
+
+        if not created and not alert.is_notified:
+            # User clicked again -> toggle unsubscribe
+            alert.delete()
+            return Response({
+                'subscribed': False,
+                'message': f'Restock notification cancelled for {product.name}'
+            })
+
+        return Response({
+            'subscribed': True,
+            'message': f'You will be notified as soon as {product.name} is back in stock! 🔔'
+        })
+
+    def get(self, request, pk):
+        is_sub = ProductNotification.objects.filter(
+            user=request.user,
+            product_id=pk,
+            is_notified=False
+        ).exists()
+        return Response({'subscribed': is_sub})
+
+
+class HomeCategoryListView(generics.ListAPIView):
+    serializer_class = HomeCategorySerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None
+
+    def get_queryset(self):
+        return HomeCategory.objects.filter(is_active=True).order_by('order', 'id')
+
+
+class CropListView(generics.ListAPIView):
+    serializer_class = CropSerializer
+    permission_classes = [permissions.AllowAny]
+    pagination_class = None
+
+    def get_queryset(self):
+        qs = Crop.objects.filter(is_active=True)
+        if self.request.query_params.get('featured') == 'true':
+            qs = qs.filter(is_featured=True)
+        return qs.order_by('order', 'id')
+
+
+

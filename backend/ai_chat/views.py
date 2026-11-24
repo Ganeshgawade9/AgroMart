@@ -198,6 +198,8 @@ class AIChatbotView(APIView):
                                 'longitude': float(seller.longitude),
                             })
 
+                from maps.routing import enrich_shops_with_road_distance
+                nearby_shops = enrich_shops_with_road_distance(lat, lng, nearby_shops)
                 nearby_shops.sort(key=lambda x: x['distance_km'])
                 nearby_shops = nearby_shops[:5]
             except Exception:

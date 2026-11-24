@@ -14,8 +14,8 @@ class DownloadInvoiceView(APIView):
             # Farmer or seller can download their order invoice
             if user.role == 'farmer':
                 order = Order.objects.get(id=order_id, farmer=user)
-                if order.status != 'delivered' or order.payment_status != 'paid':
-                    return HttpResponse("Invoice is only available after successful delivery and payment.", status=403)
+                if order.payment_status != 'paid' and order.status != 'delivered':
+                    return HttpResponse("Invoice is only available after payment or successful delivery.", status=403)
             elif user.role == 'seller':
                 order = Order.objects.get(id=order_id, seller=user)
             else:

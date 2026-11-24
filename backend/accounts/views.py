@@ -39,6 +39,67 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
 
 
+from django.conf import settings
+from notifications.sms import normalize_phone, mask_phone
+
+
+class SendRegisterOTPView(APIView):
+    """Send an SMS OTP to verify a mobile number before registration."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        phone = request.data.get('phone', '')
+        email = request.data.get('email', '')
+        number = normalize_phone(phone)
+        if not number:
+            return Response({'error': 'Enter a valid 10-digit Indian mobile number (starting with 6-9).'}, status=400)
+
+        pattern = r'^\D*(?:(?:91|0)\D*)?' + r'\D*'.join(number) + r'\D*$'
+        if User.objects.filter(phone__regex=pattern, is_active=True).exists():
+            return Response({'error': 'An account with this mobile number already exists. Please log in or reset your password.'}, status=400)
+
+        if email and User.objects.filter(email__iexact=str(email).strip()).exists():
+            return Response({'error': 'An account with this email already exists. Please log in.'}, status=400)
+
+        res, code = password_otp.issue_registration_otp(number)
+        if res == 'throttled':
+            return Response({'error': f'Please wait {settings.OTP_RESEND_SECONDS} seconds before requesting another OTP.'}, status=429)
+        elif res != 'sent':
+            return Response({'error': 'Failed to send OTP. Please check the mobile number and try again.'}, status=400)
+
+        data = {
+            'message': f'Verification OTP sent to {mask_phone(number)}.',
+            'phone': number,
+            'phone_masked': mask_phone(number),
+            'resend_seconds': settings.OTP_RESEND_SECONDS,
+        }
+        if settings.DEBUG and code:
+            data['dev_otp'] = code
+        return Response(data)
+
+
+
+class VerifyRegisterOTPView(APIView):
+    """Verify the registration OTP submitted by the user."""
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        phone = request.data.get('phone', '')
+        otp = request.data.get('otp', '')
+        number = normalize_phone(phone)
+        if not number:
+            return Response({'error': 'Invalid mobile number.'}, status=400)
+        if not otp or len(str(otp).strip()) != 6:
+            return Response({'error': 'Enter a valid 6-digit OTP.'}, status=400)
+
+        if not password_otp.verify_registration_otp(number, str(otp).strip()):
+            return Response({'error': 'Invalid or expired OTP. Please try again.'}, status=400)
+
+        return Response({'message': 'Mobile number verified successfully.', 'phone': number, 'verified': True})
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
@@ -57,6 +118,7 @@ class RegisterView(generics.CreateAPIView):
                 'access': str(refresh.access_token),
             }
         }, status=status.HTTP_201_CREATED)
+
 
 
 class ProfileView(generics.RetrieveUpdateAPIView):
@@ -123,14 +185,26 @@ class ForgotPasswordView(APIView):
         serializer = ForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = password_otp.find_user(serializer.validated_data['identifier'])
+        code = None
         if user:
-            password_otp.issue_otp(user)
-        # Same answer whether or not the account exists, so this cannot be used to probe for users
-        return Response({'message': 'If an account exists with these details, an OTP has been sent to its registered mobile number.'})
+            res = password_otp.issue_otp(user)
+            if isinstance(res, tuple):
+                _, code = res
+
+        resp_data = {'message': 'If an account exists with these details, an OTP has been sent to its registered mobile number.'}
+        if user:
+            resp_data['phone'] = user.phone          # needed by frontend to call Firebase signInWithPhoneNumber
+            resp_data['phone_masked'] = mask_phone(user.phone)
+            resp_data['resend_seconds'] = settings.OTP_RESEND_SECONDS
+            if settings.DEBUG and code:
+                resp_data['dev_otp'] = code
+        return Response(resp_data)
+
+
 
 
 class ResetPasswordView(APIView):
-    """Step 2: verify the OTP and set a new password."""
+    """Step 2: verify the OTP (or Firebase token) and set a new password."""
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
 
@@ -139,11 +213,25 @@ class ResetPasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
         user = password_otp.find_user(data['identifier'])
-        if not user or not password_otp.verify_otp(user, data['otp']):
-            return Response({'error': 'Invalid or expired OTP'}, status=400)
+        if not user:
+            return Response({'error': 'Invalid or expired request'}, status=400)
+
+        verified = False
+        if data.get('firebase_token'):
+            from .firebase import verify_firebase_id_token
+            ok, _ = verify_firebase_id_token(data['firebase_token'], expected_phone=user.phone)
+            if ok:
+                verified = True
+        elif data.get('otp'):
+            if password_otp.verify_otp(user, data['otp']):
+                verified = True
+
+        if not verified:
+            return Response({'error': 'Invalid or expired OTP verification'}, status=400)
 
         user.set_password(data['new_password'])
         user.save(update_fields=['password'])
+
         # Sign the user out everywhere: old refresh tokens stop working
         from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
         for token in OutstandingToken.objects.filter(user=user):
@@ -191,5 +279,3 @@ class FarmerListView(generics.ListAPIView):
 
 
 from .admin_views import AdminDashboardStatsView, AdminUserListView, AdminToggleUserView, AdminProductListView
-#EOF
-#echo "views.py rewritten"
