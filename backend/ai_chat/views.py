@@ -104,10 +104,17 @@ def rule_based_response(message):
 
 
 def ai_response_cohere(message):
-    """Use Cohere API for smarter responses."""
+    """Use Cohere REST API for smarter responses without heavy SDK."""
+    api_key = getattr(settings, 'COHERE_API_KEY', None)
+    if not api_key:
+        return None
     try:
-        import cohere
-        co = cohere.Client(settings.COHERE_API_KEY)
+        import requests
+        headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
         prompt = f"""You are an expert Indian agricultural advisor. A farmer has described their crop problem:
 
 "{message}"
@@ -124,17 +131,19 @@ Respond ONLY with a valid JSON object (no markdown, no explanation outside JSON)
 
 Focus on Maharashtra farming context. Be specific with Indian product names and dosages."""
 
-        response = co.generate(
-            model='command',
-            prompt=prompt,
-            max_tokens=400,
-            temperature=0.3,
-        )
-        text = response.generations[0].text.strip()
-        # Extract JSON from response
-        json_match = re.search(r'\{.*\}', text, re.DOTALL)
-        if json_match:
-            return json.loads(json_match.group())
+        payload = {
+            'model': 'command',
+            'prompt': prompt,
+            'max_tokens': 400,
+            'temperature': 0.3
+        }
+        resp = requests.post('https://api.cohere.com/v1/generate', json=payload, headers=headers, timeout=8)
+        if resp.status_code == 200:
+            data = resp.json()
+            text = data.get('generations', [{}])[0].get('text', '').strip()
+            json_match = re.search(r'\{.*\}', text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
         return None
     except Exception:
         return None

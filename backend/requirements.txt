@@ -25,9 +25,6 @@ razorpay==1.4.1
 # PDF generation
 reportlab==4.2.2
 
-# AI
-cohere==5.5.8
-openai==1.40.3
-
-# Utilities
+# HTTP & Utilities (lightweight)
+requests==2.32.3
 Markdown==3.6
