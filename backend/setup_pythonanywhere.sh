@@ -9,16 +9,14 @@ set -e
 
 echo "🚀 Starting AgroMart deployment setup on PythonAnywhere..."
 
-# 1. Clean pip cache to free up disk quota
-echo "🧹 Cleaning temporary cache..."
+# 1. Clean pip cache and ensure fresh clean virtualenv
+echo "🧹 Cleaning temporary cache and old virtualenv..."
 rm -rf ~/.cache/pip
-
-# 2. Ensure Python 3.10 virtual environment exists
 VENV_DIR="/home/Ganeshpatil007/.virtualenvs/agroconnect-venv"
-if [ ! -d "$VENV_DIR" ]; then
-    echo "📦 Creating virtual environment at $VENV_DIR..."
-    python3.10 -m venv "$VENV_DIR"
-fi
+rm -rf "$VENV_DIR"
+
+echo "📦 Creating fresh virtual environment at $VENV_DIR..."
+python3.10 -m venv "$VENV_DIR"
 
 # 3. Activate virtual environment
 echo "🔄 Activating virtual environment..."

@@ -20,8 +20,6 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
     'django_filters',
-    'cloudinary',
-    'cloudinary_storage',
     'accounts',
     'products',
     'orders',
@@ -121,6 +119,7 @@ CLOUDINARY_STORAGE = {
 }
 # Use Cloudinary only when credentials are provided; fall back to local media in dev
 if CLOUDINARY_CLOUD_NAME:
+    INSTALLED_APPS += ['cloudinary', 'cloudinary_storage']
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 else:
     DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'

@@ -6,25 +6,11 @@ django-cors-headers==4.4.0
 django-filter==24.3
 python-decouple==3.8
 
-# Database
-psycopg2-binary==2.9.9
-dj-database-url==2.2.0
-
-# Storage & Images
+# Images & Payments
 Pillow==10.4.0
-cloudinary==1.40.0
-django-cloudinary-storage==0.3.0
-
-# Static files (production)
-whitenoise==6.7.0
-gunicorn==22.0.0
-
-# Payments
 razorpay==1.4.1
 
-# PDF generation
+# PDF generation & Utilities
 reportlab==4.2.2
-
-# HTTP & Utilities (lightweight)
 requests==2.32.3
 Markdown==3.6
