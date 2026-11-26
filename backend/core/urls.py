@@ -33,6 +33,15 @@ def root_index(request):
 
 def spa_fallback(request, path=''):
     if dist_dir:
+        clean_path = (path or '').lstrip('/')
+        if clean_path:
+            dist_root = dist_dir.resolve()
+            candidate = (dist_root / clean_path).resolve()
+            try:
+                if candidate.is_relative_to(dist_root) and candidate.is_file():
+                    return static_serve(request, clean_path, document_root=dist_root)
+            except ValueError:
+                pass
         index_file = dist_dir / 'index.html'
         if index_file.exists():
             return FileResponse(open(index_file, 'rb'))
@@ -56,6 +65,6 @@ if dist_dir and (dist_dir / 'assets').exists():
     ]
 
 urlpatterns += [
-    re_path(r'^(?!admin|api|static|media|assets).*$', spa_fallback),
+    re_path(r'^(?P<path>(?!admin(?:/|$)|api(?:/|$)|static(?:/|$)|media(?:/|$)|assets(?:/|$)).*)$', spa_fallback),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

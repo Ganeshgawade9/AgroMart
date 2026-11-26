@@ -15,7 +15,7 @@ const resolveBaseUrl = () => {
   if (isNativePlatform()) {
     // If inside mobile APK and envUrl is missing or points to localhost, route to PythonAnywhere production
     if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
-      return 'https://Ganeshpatil007.pythonanywhere.com/api';
+      return 'https://ganeshpatil007.pythonanywhere.com/api';
     }
   }
   return envUrl || 'http://localhost:8000/api';

@@ -7,6 +7,7 @@
 # +-------------------------------------------------------------------------------+
 
 import os
+import site
 import sys
 
 # 1. Project path: Points to the backend directory where manage.py and core/ live
@@ -17,13 +18,17 @@ if project_home not in sys.path:
 # 2. Django settings module
 os.environ['DJANGO_SETTINGS_MODULE'] = 'core.settings'
 
-# 3. Optional: activate virtual environment if not using the Web tab virtualenv field
-# (Setting the virtualenv in PythonAnywhere Web Tab to:
-#  /home/Ganeshpatil007/.virtualenvs/agroconnect-venv  is recommended)
-activate_env = '/home/Ganeshpatil007/.virtualenvs/agroconnect-venv/bin/activate_this.py'
+# 3. Activate virtual environment
+# (Also set Virtualenv in PythonAnywhere Web Tab to /home/Ganeshpatil007/.virtualenvs/agroconnect-venv)
+venv_dir = '/home/Ganeshpatil007/.virtualenvs/agroconnect-venv'
+activate_env = f'{venv_dir}/bin/activate_this.py'
 if os.path.exists(activate_env):
     with open(activate_env) as f:
         exec(f.read(), dict(__file__=activate_env))
+else:
+    venv_site = f'{venv_dir}/lib/python{sys.version_info.major}.{sys.version_info.minor}/site-packages'
+    if os.path.isdir(venv_site) and venv_site not in sys.path:
+        site.addsitedir(venv_site)
 
 # 4. Import and create the WSGI application
 from django.core.wsgi import get_wsgi_application

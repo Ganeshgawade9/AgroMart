@@ -46,7 +46,7 @@ export const getBackendBaseUrl = () => {
   );
   const envUrl = import.meta.env.VITE_API_URL;
   if (isNative && (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1'))) {
-    return 'https://Ganeshpatil007.pythonanywhere.com';
+    return 'https://ganeshpatil007.pythonanywhere.com';
   }
   return (envUrl || 'http://localhost:8000/api').replace(/\/api\/?$/, '');
 };

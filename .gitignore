@@ -79,6 +79,7 @@ yarn-error.log*
 pnpm-debug.log*
 .npm
 frontend/dist/
+frontend/dist.zip
 
 # ==============================================================================
 # Android & Mobile Build Artifacts

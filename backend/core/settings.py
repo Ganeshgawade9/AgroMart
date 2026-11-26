@@ -6,7 +6,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-agroconnect-change-in-production-xyz123')
 DEBUG = config('DEBUG', default=True, cast=bool)
-ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='*,Ganeshpatil007.pythonanywhere.com,localhost,127.0.0.1').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in config('ALLOWED_HOSTS', default='*,ganeshpatil007.pythonanywhere.com,Ganeshpatil007.pythonanywhere.com,localhost,127.0.0.1').split(',') if h.strip()]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -91,7 +91,7 @@ CORS_ALLOWED_ORIGINS = [
     origin.strip()
     for origin in config(
         'CORS_ALLOWED_ORIGINS',
-        default='http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,https://Ganeshpatil007.pythonanywhere.com,https://localhost,capacitor://localhost'
+        default='http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,https://ganeshpatil007.pythonanywhere.com,https://Ganeshpatil007.pythonanywhere.com,https://localhost,capacitor://localhost'
     ).split(',')
     if origin.strip()
 ]
@@ -102,7 +102,7 @@ CSRF_TRUSTED_ORIGINS = [
     origin.strip()
     for origin in config(
         'CSRF_TRUSTED_ORIGINS',
-        default='https://Ganeshpatil007.pythonanywhere.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000,https://localhost,capacitor://localhost'
+        default='https://ganeshpatil007.pythonanywhere.com,https://Ganeshpatil007.pythonanywhere.com,http://localhost:5173,http://127.0.0.1:5173,http://localhost:8000,http://127.0.0.1:8000,https://localhost,capacitor://localhost'
     ).split(',')
     if origin.strip()
 ]

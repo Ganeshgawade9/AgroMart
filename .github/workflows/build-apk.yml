@@ -31,7 +31,7 @@ jobs:
       - name: Install Frontend Dependencies & Build Web Assets
         working-directory: ./frontend
         env:
-          VITE_API_URL: https://Ganeshpatil007.pythonanywhere.com/api
+          VITE_API_URL: https://ganeshpatil007.pythonanywhere.com/api
         run: |
           npm install
           npm run cap:sync
